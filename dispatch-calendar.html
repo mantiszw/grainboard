@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Demeter Grainboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#ffffff;
@@ -41,9 +44,11 @@
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     color:var(--ink);background:var(--bg);
     display:flex;flex-direction:column;height:100vh;overflow:hidden;
+    -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+    text-rendering:optimizeLegibility;
   }
 
   /* ---- Top bar ---- */
@@ -170,10 +175,10 @@
   /* ---- Event block ---- */
   .ev{
     position:absolute;border-radius:4px;overflow:hidden;cursor:grab;
-    padding:1px 5px;font-size:10.5px;line-height:1.1;
+    padding:2px 7px;font-size:11px;line-height:1.25;
     border:1px solid rgba(0,0,0,.14);
     box-shadow:0 1px 1px rgba(0,0,0,.06);
-    color:#2a2a30;user-select:none;touch-action:none;
+    color:#1f1f26;user-select:none;touch-action:none;
     transition:box-shadow .12s;
     display:flex;flex-direction:column;justify-content:center;
   }
@@ -195,9 +200,9 @@
   /* faint guide line showing the snapped drop position */
   .snap-guide{position:absolute;left:1px;right:1px;height:0;z-index:99;pointer-events:none;
     border-top:2px dashed rgba(37,99,201,.65)}
-  .ev .title{font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:46px}
-  .ev .sub{font-weight:600;opacity:.82;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9.5px}
-  .ev .tm{font-weight:600;opacity:.6;font-size:9px;white-space:nowrap}
+  .ev .title{font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:52px;font-size:11.5px}
+  .ev .sub{font-weight:500;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+  .ev .tm{font-weight:500;opacity:.7;font-size:9.5px;white-space:nowrap}
   /* clash (narrow) blocks: tiny text + wrap so the whole name shows
      — "Millstone Ops"/"Schilling Holdings" instead of just "M…"/"S…" */
   .ev.clash{padding:3px 4px}
@@ -215,8 +220,8 @@
   /* transporter ribbon — top-right corner, colour-coded per transporter */
   .ev-trans{
     position:absolute;top:0;right:0;z-index:3;
-    font-size:8.5px;font-weight:800;letter-spacing:.03em;line-height:1.35;
-    padding:2px 6px;border-radius:0 3px 0 6px;
+    font-size:7.5px;font-weight:800;letter-spacing:.03em;line-height:1.3;
+    padding:1px 5px;border-radius:0 3px 0 6px;
     color:#fff;text-transform:uppercase;
     max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     box-shadow:-1px 1px 2px rgba(0,0,0,.2);
