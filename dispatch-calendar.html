@@ -271,24 +271,25 @@
   /* Timely-style: pale tint of the commodity colour + dark text + a coloured
      left bar so the commodity is still identifiable. Calmer on a full day. */
   .ev{border-left:4px solid var(--evc)}
-  /* scheduled = gentle pale stripe; arrived = solid pale tint */
+  /* scheduled = soft stripe; arrived = solid tint. A bit stronger than pastel
+     so blocks stand out from the grid, still dark text for readability. */
   .ev.sched{
     background-image:repeating-linear-gradient(45deg,
-      color-mix(in srgb, var(--evc) 20%, #ffffff) 0, color-mix(in srgb, var(--evc) 20%, #ffffff) 9px,
-      color-mix(in srgb, var(--evc) 11%, #ffffff) 9px, color-mix(in srgb, var(--evc) 11%, #ffffff) 18px);
+      color-mix(in srgb, var(--evc) 40%, #ffffff) 0, color-mix(in srgb, var(--evc) 40%, #ffffff) 9px,
+      color-mix(in srgb, var(--evc) 24%, #ffffff) 9px, color-mix(in srgb, var(--evc) 24%, #ffffff) 18px);
   }
-  .ev.arrived{background:color-mix(in srgb, var(--evc) 26%, #ffffff)}
-  .ev .sub{color:color-mix(in srgb, var(--evc) 60%, #333)}
-  /* very dark commodities (vetch black, canola grey): the tint stays light so
-     dark text still reads — no need for white text any more */
+  .ev.arrived{background:color-mix(in srgb, var(--evc) 46%, #ffffff)}
+  .ev .sub{color:color-mix(in srgb, var(--evc) 70%, #333)}
+  /* very dark commodities (vetch black, canola grey): keep the tint lighter so
+     dark text still reads */
   .ev.darktext{color:#2a2a30}
-  .ev.darktext .sub, .ev.darktext .tm{color:#4a4a52;opacity:1}
+  .ev.darktext .sub, .ev.darktext .tm{color:#3a3a42;opacity:1}
   .ev.darktext.sched{
     background-image:repeating-linear-gradient(45deg,
-      color-mix(in srgb, var(--evc) 22%, #ffffff) 0, color-mix(in srgb, var(--evc) 22%, #ffffff) 9px,
-      color-mix(in srgb, var(--evc) 13%, #ffffff) 9px, color-mix(in srgb, var(--evc) 13%, #ffffff) 18px);
+      color-mix(in srgb, var(--evc) 32%, #ffffff) 0, color-mix(in srgb, var(--evc) 32%, #ffffff) 9px,
+      color-mix(in srgb, var(--evc) 19%, #ffffff) 9px, color-mix(in srgb, var(--evc) 19%, #ffffff) 18px);
   }
-  .ev.darktext.arrived{background:color-mix(in srgb, var(--evc) 28%, #ffffff)}
+  .ev.darktext.arrived{background:color-mix(in srgb, var(--evc) 38%, #ffffff)}
 
   /* drop target highlight */
   .daycol.drop-ok{background:#eef7ff}
