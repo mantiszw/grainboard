@@ -711,6 +711,9 @@ function guessYear(mon,day){
 function parseTimeMin(s){
   if(!s) return null;
   s=String(s).trim();
+  // Google's "empty time" placeholder (date serial 0) → treat as NO time,
+  // so these rows don't render as bogus midnight blocks
+  if(/1899/.test(s) || /^30\/12\/1899/.test(s)) return null;
   // ISO datetime → take the time part
   let m=s.match(/T(\d{2}):(\d{2})/);
   if(m) return (+m[1])*60 + (+m[2]);
