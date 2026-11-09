@@ -201,6 +201,12 @@
   .snap-guide{position:absolute;left:1px;right:1px;height:0;z-index:99;pointer-events:none;
     border-top:2px dashed rgba(37,99,201,.65)}
   .ev .title{font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:52px;font-size:11.5px}
+  /* per-booking tag pill beside the name (e.g. "25t") — this load only */
+  .ev-tag{display:inline-block;margin-left:5px;padding:0 5px;border-radius:7px;
+    font-size:9.5px;font-weight:700;letter-spacing:-.01em;vertical-align:1px;
+    background:rgba(0,0,0,.14);color:inherit;white-space:nowrap}
+  .ev.darktext .ev-tag{background:rgba(255,255,255,.26)}
+  .ev.clash .ev-tag{font-size:8px;margin-left:3px;padding:0 3px}
   .ev .sub{font-weight:500;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
   .ev .tm{font-weight:500;opacity:.7;font-size:9.5px;white-space:nowrap}
   /* clash (narrow) blocks: tiny text + wrap so the whole name shows
@@ -284,7 +290,7 @@
       color-mix(in srgb, var(--evc) 36%, #ffffff) 9px, color-mix(in srgb, var(--evc) 36%, #ffffff) 18px);
   }
   .ev.arrived{background:color-mix(in srgb, var(--evc) 60%, #ffffff)}
-  .ev .sub{color:color-mix(in srgb, var(--evc) 78%, #222)}
+  .ev .sub{color:#2a2a30;opacity:.92}   /* commodity line — solid dark so it's always readable */
   /* very dark commodities (vetch black, canola grey): keep the tint lighter so
      dark text still reads */
   .ev.darktext{color:#1f1f26}
@@ -804,7 +810,7 @@ function normalise(r, sheet){
   return {
     id:r.id, sheetKey:key, sheetName:sheetMeta(key).name, url:sheet.url,
     site:r.site||"", commodity:r.commodity||"", release:r.release||"",
-    status:r.status||"", driver:r.driver||"", note:r.note||"",
+    status:r.status||"", driver:r.driver||"", note:r.note||"", tag:r.tag||"",
     grid:grid,                                    // blank/anything else → Grid 1
     grade:r.grade||"",
     apptStatus:r.apptStatus||"",
@@ -1165,14 +1171,17 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const driverBadge = driver ? `<span class="ev-driver">${esc(driver)}</span>` : "";
   const note=(j.note||"").trim();
   const flag = note ? `<span class="ev-flag" title="${esc(note)}">📩</span>` : "";
+  // per-booking visible tag (e.g. "25t") — shows as a pill beside the name, this load only
+  const tag=(j.tag||"").trim();
+  const tagPill = tag ? `<span class="ev-tag" title="${esc(tag)}">${esc(tag)}</span>` : "";
   return `<div class="ev ${cls}${compact}${dark}${clash?' clash':''}" data-id="${j.id}" data-sheet="${j.sheetKey}"
        data-stack="${cols>1?1:0}" data-z="${z}"
-       title="${esc(line1)} — ${esc(commGrade)} · ${esc(meta.name)}${driver?(' · '+esc(driver)):''}${note?(' · 📝 '+esc(note)):''} · ${timeRange} · Grid ${gridNo}${clash?' · double booking':''}"
+       title="${esc(line1)}${tag?(' ['+esc(tag)+']'):''} — ${esc(commGrade)} · ${esc(meta.name)}${driver?(' · '+esc(driver)):''}${note?(' · 📝 '+esc(note)):''} · ${timeRange} · Grid ${gridNo}${clash?' · double booking':''}"
        style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${width}% - 2px);z-index:${z};--evc:${cvar};--gb:${gridBase}%;--gs:${gridSpan}%">
     ${transBadge}
     ${flag}
     ${cancelled?`<span class="cxtag">CANCELLED</span>`:driverBadge}
-    <div class="title">${esc(line1)}</div>
+    <div class="title">${esc(line1)}${tagPill}</div>
     <div class="sub">${esc(commGrade)}</div>
     <div class="tm">${line3}</div>
     <div class="resize-handle"></div>
@@ -1414,8 +1423,9 @@ function openEditor(job){
     url: job.url,
     origSheetKey: job.sheetKey,   // remember where it lives, to detect a transporter change
     origUrl: job.url,
+    origSite: job.site,           // remember the grower name, to propagate an edit to its other bookings
     site: job.site,
-    release: job.release||"", contact: job.contact||"", phone: job.phone||"", maps: job.maps||"", driver: job.driver||"", note: job.note||"",
+    release: job.release||"", contact: job.contact||"", phone: job.phone||"", maps: job.maps||"", driver: job.driver||"", note: job.note||"", tag: job.tag||"",
     date: job.tipDate,
     services: siblings.map(j=>({
       id:j.id, commodity:j.commodity||"", grade:j.grade||"",
@@ -1449,7 +1459,7 @@ function openNewBooking(date, min, grid){
   EDIT = {
     isNew:true,
     sheetKey: sheet.key, url: sheet.url,
-    site:"", release:"", contact:"", phone:"", maps:"", driver:"", note:"", date,
+    site:"", release:"", contact:"", phone:"", maps:"", driver:"", note:"", tag:"", date,
     services:[{ id:null, commodity:"", grade:"", grid, time:minToSheetTime(min),
                 duration:DEFAULT_DUR, apptStatus:"Pencilled" }],
     origIds:[],
@@ -1659,6 +1669,11 @@ function renderEditor(){
         <input class="lineinput" id="editSite" type="text" value="${esc(EDIT.site)}" placeholder="Grower / Site"
                onchange="EDIT.site=this.value">
       </div>
+      <div class="m-field">
+        <span class="ic">🏷️</span>
+        <input class="lineinput" id="editTag" type="text" value="${esc(EDIT.tag||'')}" placeholder="Tag — shows beside the name (e.g. 25t, HALF LOAD)" maxlength="24"
+               oninput="EDIT.tag=this.value">
+      </div>
       <div class="m-field two-col">
         <span class="ic">📇</span>
         <input class="lineinput" id="editContact" type="text" value="${esc(EDIT.contact||'')}" placeholder="Contact (e.g. farm manager)"
@@ -1732,6 +1747,8 @@ function syncEditFields(){
   if(relEl) EDIT.release=relEl.value;
   const noteEl=document.getElementById("editNote");
   if(noteEl) EDIT.note=noteEl.value;
+  const tagEl=document.getElementById("editTag");
+  if(tagEl) EDIT.tag=tagEl.value;
   const contactEl=document.getElementById("editContact");
   if(contactEl) EDIT.contact=contactEl.value;
   const phoneEl=document.getElementById("editPhone");
@@ -1856,10 +1873,15 @@ function saveAppt(){
   const maps=(EDIT.maps||"").trim();
   const driver=(EDIT.driver||"").trim();
   const note=(EDIT.note||"").trim();
+  const tag=(EDIT.tag||"").trim();
   const dateISO = EDIT.date ? isoDate(EDIT.date) : "";
   const tipDate = EDIT.date;
   const services=EDIT.services.map(s=>({...s}));
   const toDelete=(EDIT._toDelete||[]).slice();
+  // capture propagation inputs NOW — closeEditor() below nulls EDIT
+  const propIsNew   = !!EDIT.isNew;
+  const propOrigName= (EDIT.origSite||"").trim().toLowerCase();
+  const propEditedIds = new Set(EDIT.origIds||[]);
 
   // ---- OPTIMISTIC: update local state + UI immediately, write in background ----
   // 1. apply deletes locally
@@ -1869,7 +1891,7 @@ function saveAppt(){
     const tmin=parseTimeMin(sv.time);
     if(sv.id){
       const j=STATE.jobs.find(x=>x.id===sv.id);
-      if(j){ j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.maps=maps; j.driver=driver; j.note=note;
+      if(j){ j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.maps=maps; j.driver=driver; j.note=note; j.tag=tag;
              j.tipDate=tipDate; j.tipMin=tmin; j.grid=+sv.grid;
              j.duration=+sv.duration; j.commodity=sv.commodity; j.grade=sv.grade; j.apptStatus=sv.apptStatus; }
     }else{
@@ -1902,6 +1924,25 @@ function saveAppt(){
   if(site){
     saveGrower(url, { site, release, contact, phone, maps, driver,
       commodity:(services[0]&&services[0].commodity)||"", grade:(services[0]&&services[0].grade)||"" });
+  }
+  // ---- propagate the grower edit to this grower's OTHER bookings ----
+  // match by the ORIGINAL grower name (exact, case-insensitive). If the grower
+  // name or its details changed, update every other booking for that grower so
+  // they stay consistent across the board.
+  if(!propIsNew){
+    const origName=propOrigName;
+    const editedIds=propEditedIds;
+    if(origName){
+      STATE.jobs.forEach(j=>{
+        if(editedIds.has(j.id)) return;                 // skip the ones we just edited
+        if((j.site||"").trim().toLowerCase()!==origName) return;
+        if(/^tmp/.test(j.id||"")) return;               // skip not-yet-saved
+        // update the grower-level details on this other booking
+        j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.maps=maps; j.driver=driver;
+        const f={ site, release, contact, phone, maps, driver };
+        jobs.push(postAction(j.url,{action:"update",id:j.id,fields:f}));
+      });
+    }
   }
   Promise.all(jobs).then(results=>{
     const ok=results.every(r=>r&&r.ok);
