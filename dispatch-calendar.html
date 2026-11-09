@@ -215,11 +215,11 @@
   /* transporter ribbon — top-right corner, colour-coded per transporter */
   .ev-trans{
     position:absolute;top:0;right:0;z-index:3;
-    font-size:6.5px;font-weight:800;letter-spacing:.02em;line-height:1.3;
-    padding:1px 4px;border-radius:0 3px 0 5px;
+    font-size:8.5px;font-weight:800;letter-spacing:.03em;line-height:1.35;
+    padding:2px 6px;border-radius:0 3px 0 6px;
     color:#fff;text-transform:uppercase;
-    max-width:78%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    box-shadow:-1px 1px 2px rgba(0,0,0,.15);
+    max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    box-shadow:-1px 1px 2px rgba(0,0,0,.2);
   }
   /* driver badge — bottom-right corner */
   .ev-driver{
@@ -1153,7 +1153,10 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const width = colW - rightGap;
   const z = 2 + col;
   const meta = sheetMeta(j.sheetKey);
-  const transBadge = `<span class="ev-trans" style="background:${meta.color}" title="${esc(meta.name)}">${esc(meta.short)}</span>`;
+  // no ribbon for Growers own (OWN) — it's the default, so a tag is just noise
+  const transBadge = (j.sheetKey==="OWN")
+    ? ""
+    : `<span class="ev-trans" style="background:${meta.color}" title="${esc(meta.name)}">${esc(meta.short)}</span>`;
   const driverBadge = driver ? `<span class="ev-driver">${esc(driver)}</span>` : "";
   const note=(j.note||"").trim();
   const flag = note ? `<span class="ev-flag" title="${esc(note)}">📩</span>` : "";
