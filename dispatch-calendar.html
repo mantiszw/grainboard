@@ -268,23 +268,27 @@
   .ev:hover .resize-handle::after{opacity:1}
   .ev.resizing{box-shadow:0 4px 14px rgba(0,0,0,.22);z-index:100}
 
-  /* scheduled = striped; arrived = solid (added later via .arrived) */
+  /* Timely-style: pale tint of the commodity colour + dark text + a coloured
+     left bar so the commodity is still identifiable. Calmer on a full day. */
+  .ev{border-left:4px solid var(--evc)}
+  /* scheduled = gentle pale stripe; arrived = solid pale tint */
   .ev.sched{
     background-image:repeating-linear-gradient(45deg,
-      var(--evc) 0, var(--evc) 7px,
-      color-mix(in srgb, var(--evc) 55%, #ffffff) 7px,
-      color-mix(in srgb, var(--evc) 55%, #ffffff) 14px);
+      color-mix(in srgb, var(--evc) 20%, #ffffff) 0, color-mix(in srgb, var(--evc) 20%, #ffffff) 9px,
+      color-mix(in srgb, var(--evc) 11%, #ffffff) 9px, color-mix(in srgb, var(--evc) 11%, #ffffff) 18px);
   }
-  .ev.arrived{background:var(--evc)}
-  /* dark commodities (canola, vetch): white text always, and a darker stripe so white reads */
-  .ev.darktext{color:#ffffff}
-  .ev.darktext .sub, .ev.darktext .tm{opacity:1;color:rgba(255,255,255,.9)}
+  .ev.arrived{background:color-mix(in srgb, var(--evc) 26%, #ffffff)}
+  .ev .sub{color:color-mix(in srgb, var(--evc) 60%, #333)}
+  /* very dark commodities (vetch black, canola grey): the tint stays light so
+     dark text still reads — no need for white text any more */
+  .ev.darktext{color:#2a2a30}
+  .ev.darktext .sub, .ev.darktext .tm{color:#4a4a52;opacity:1}
   .ev.darktext.sched{
     background-image:repeating-linear-gradient(45deg,
-      var(--evc) 0, var(--evc) 8px,
-      color-mix(in srgb, var(--evc) 78%, #000000) 8px,
-      color-mix(in srgb, var(--evc) 78%, #000000) 16px);
+      color-mix(in srgb, var(--evc) 22%, #ffffff) 0, color-mix(in srgb, var(--evc) 22%, #ffffff) 9px,
+      color-mix(in srgb, var(--evc) 13%, #ffffff) 9px, color-mix(in srgb, var(--evc) 13%, #ffffff) 18px);
   }
+  .ev.darktext.arrived{background:color-mix(in srgb, var(--evc) 28%, #ffffff)}
 
   /* drop target highlight */
   .daycol.drop-ok{background:#eef7ff}
