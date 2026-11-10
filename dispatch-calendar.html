@@ -968,7 +968,7 @@ function beginPlacing(mode){
   // snapshot the booking (all its split services) before closing the editor
   const snap={
     sheetKey:EDIT.sheetKey, url:EDIT.url, site:EDIT.site, release:EDIT.release||"",
-    contact:EDIT.contact||"", phone:EDIT.phone||"", maps:EDIT.maps||"", driver:EDIT.driver||"",
+    contact:EDIT.contact||"", phone:EDIT.phone||"", maps:EDIT.maps||"", driver:EDIT.driver||"", tag:EDIT.tag||"",
     services:EDIT.services.map(s=>({...s})), origIds:(EDIT.origIds||[]).slice()
   };
   PLACING={ mode, job:snap };
@@ -1017,7 +1017,7 @@ function openRepeat(){
   // snapshot current booking
   REPEAT_BASE={
     sheetKey:EDIT.sheetKey, url:EDIT.url, site:EDIT.site, release:EDIT.release||"",
-    contact:EDIT.contact||"", phone:EDIT.phone||"", maps:EDIT.maps||"", driver:EDIT.driver||"",
+    contact:EDIT.contact||"", phone:EDIT.phone||"", maps:EDIT.maps||"", driver:EDIT.driver||"", tag:EDIT.tag||"",
     services:EDIT.services.map(s=>({...s})),
     date:EDIT.date, grid:(EDIT.services[0]?(+EDIT.services[0].grid||1):1),
     min:(EDIT.services[0]?parseTimeMin(EDIT.services[0].time):DAY_START*60)
@@ -1084,11 +1084,11 @@ function createBookingAt(base, date, min, grid){
     const tmin=min+off;
     const tempId="tmp"+Math.random().toString(36).slice(2,9);
     STATE.jobs.push({ id:tempId, sheetKey, url, site:base.site, release:base.release,
-      contact:base.contact, phone:base.phone, maps:base.maps, driver:base.driver,
+      contact:base.contact, phone:base.phone, maps:base.maps, driver:base.driver, tag:base.tag||"",
       commodity:sv.commodity, grade:sv.grade, status:"", grid:(grid), duration:+sv.duration,
       apptStatus:sv.apptStatus||"Pencilled", tipDate:date, tipMin:tmin, arrived:false });
     const fields={ site:base.site, release:base.release, contact:base.contact, phone:base.phone,
-      maps:base.maps, driver:base.driver, tipDate:dateISO, tipTime:minToSheetTime(tmin),
+      maps:base.maps, driver:base.driver, tag:base.tag||"", tipDate:dateISO, tipTime:minToSheetTime(tmin),
       grid:String(grid), duration:String(sv.duration), commodity:sv.commodity, grade:sv.grade,
       apptStatus:sv.apptStatus||"Pencilled", transporter:sheetKey };
     writes.push(postAction(url,{action:"create",fields}).then(r=>{
@@ -1898,7 +1898,7 @@ function saveAppt(){
       // temporary local job until the sheet gives it a real id
       sv._tempId="tmp"+Math.random().toString(36).slice(2,9);
       STATE.jobs.push({ id:sv._tempId, sheetKey, url, site, commodity:sv.commodity, grade:sv.grade,
-        release, contact, phone, maps, status:"", driver, note, grid:+sv.grid, duration:+sv.duration,
+        release, contact, phone, maps, status:"", driver, note, tag, grid:+sv.grid, duration:+sv.duration,
         apptStatus:sv.apptStatus, tipDate, tipMin:tmin, arrived:false });
     }
   });
@@ -1910,7 +1910,7 @@ function saveAppt(){
   const jobs=[];
   toDelete.forEach(id=> jobs.push(postAction(url,{action:"delete",id})));
   services.forEach(sv=>{
-    const fields={ site, release, contact, phone, maps, driver, note, tipDate:dateISO, tipTime:sv.time, grid:String(sv.grid),
+    const fields={ site, release, contact, phone, maps, driver, note, tag, tipDate:dateISO, tipTime:sv.time, grid:String(sv.grid),
       duration:String(sv.duration), commodity:sv.commodity, grade:sv.grade, apptStatus:sv.apptStatus,
       transporter:sheetKey };   // tag the booking type (for shared "Other" sheet)
     if(sv.id){ jobs.push(postAction(url,{action:"update",id:sv.id,fields})); }
@@ -1969,6 +1969,7 @@ function moveToTransporter(){
   const contact=(EDIT.contact||"").trim(), phone=(EDIT.phone||"").trim();
   const maps=(EDIT.maps||"").trim(), driver=(EDIT.driver||"").trim();
   const note=(EDIT.note||"").trim();
+  const tag=(EDIT.tag||"").trim();
   const dateISO=EDIT.date?isoDate(EDIT.date):"";
   const tipDate=EDIT.date;
   const services=EDIT.services.map(s=>({...s}));
@@ -1982,7 +1983,7 @@ function moveToTransporter(){
     const tmin=parseTimeMin(sv.time);
     sv._tempId="tmp"+Math.random().toString(36).slice(2,9);
     STATE.jobs.push({ id:sv._tempId, sheetKey:newKey, url:newUrl, site, release, contact, phone, maps,
-      status:"", driver, note, commodity:sv.commodity, grade:sv.grade, grid:+sv.grid, duration:+sv.duration,
+      status:"", driver, note, tag, commodity:sv.commodity, grade:sv.grade, grid:+sv.grid, duration:+sv.duration,
       apptStatus:sv.apptStatus||"Pencilled", tipDate, tipMin:tmin, arrived:false });
   });
   render(); toast(`Moving to ${newMeta.name}…`);
@@ -1992,7 +1993,7 @@ function moveToTransporter(){
   oldIds.forEach(id=> writes.push(postAction(oldUrl,{action:"delete",id})));
   // create on the new sheet
   services.forEach(sv=>{
-    const fields={ site, release, contact, phone, maps, driver, note, tipDate:dateISO, tipTime:sv.time,
+    const fields={ site, release, contact, phone, maps, driver, note, tag, tipDate:dateISO, tipTime:sv.time,
       grid:String(sv.grid), duration:String(sv.duration), commodity:sv.commodity, grade:sv.grade,
       apptStatus:sv.apptStatus||"Pencilled", transporter:newKey };
     writes.push(postAction(newUrl,{action:"create",fields}).then(r=>{
