@@ -27,8 +27,11 @@
        Approximate Timely shades; adjust the hex pairs here to taste.
        Each commodity: --c-<x> base, used for both stripe and solid. */
     --c-wheat:#f2d64b;      /* wheat / ASW — yellow */
-    --c-lentils:#7ec8ef;    /* lentils — sky blue */
-    --c-oats:#b9a4e8;       /* oats — purple */
+    --c-oats:#b9a4e8;       /* oats — purple (OAT1) */
+    --c-oats2:#cfc0f0;      /* oats OAT2 — lighter purple */
+    --c-oats3:#e4dbf7;      /* oats OAT3 — lightest purple */
+    --c-lentils:#7ec8ef;    /* lentils / Nipper — sky blue */
+    --c-lentils-nugget:#ef9ecb; /* lentils Nugget — pink */
     --c-lupins:#f0a9a9;     /* lupins / speckled — red-pink */
     --c-canola:#6b6f76;     /* canola — dark grey */
     --c-barley:#4f8fd4;     /* barley — blue */
@@ -361,6 +364,15 @@
   .service select.dur-sel{width:92px}
   .service .rm{position:absolute;top:8px;right:9px;border:none;background:none;color:var(--ink-faint);font-size:16px;cursor:pointer;line-height:1}
   .swatch-dot{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.15);flex-shrink:0}
+  /* clickable swatch (opens the colour picker) — a touch bigger so it's tappable */
+  .swatch-btn{width:16px;height:16px;border-radius:4px;padding:0;cursor:pointer;
+    border:1px solid rgba(0,0,0,.25);box-shadow:0 0 0 2px rgba(0,0,0,.04)}
+  .swatch-btn:hover{box-shadow:0 0 0 2px rgba(37,99,201,.35)}
+  .col-note{font-size:12.5px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;
+    border-radius:8px;padding:7px 10px}
+  .col-scope{display:flex;flex-direction:column;gap:6px;margin-top:10px;font-size:13px}
+  .col-scope label{display:flex;align-items:center;gap:7px;cursor:pointer}
+  .col-scope input{width:15px;height:15px}
   /* add-commodity colour picker */
   .col-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:8px;margin-top:8px}
   .col-sw{width:100%;aspect-ratio:1;border-radius:7px;border:2px solid transparent;cursor:pointer;padding:0;
@@ -418,7 +430,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.5</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.6</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -507,6 +519,16 @@ const COMMODITY_COLORS = [
   { match:["hay"],                      var:"--c-hay"      },
   { match:["bean"],                     var:"--c-beans"    },  // generic beans last
 ];
+/* grade-specific colours — matched on the "commodity | grade" pair (both
+   lowercased, grade contains). Checked BEFORE the commodity-only table so
+   e.g. Lentils-Nugget and Lentils-Nipper can differ. */
+const GRADE_COLORS = [
+  { commodity:"lentil", grade:"nugget", var:"--c-lentils-nugget" }, // pink
+  { commodity:"lentil", grade:"nipper", var:"--c-lentils"        }, // blue (default)
+  { commodity:"oat",    grade:"oat2",   var:"--c-oats2"          }, // lighter purple
+  { commodity:"oat",    grade:"oat3",   var:"--c-oats3"          }, // lightest purple
+  { commodity:"oat",    grade:"oat1",   var:"--c-oats"           }, // base purple
+];
 /* commodities whose fill is dark → use light text */
 const DARK_COMMODITY_VARS = ["--c-vetch","--c-canola"];
 // decide white vs dark text: dark built-in vars, or a dark custom hex
@@ -530,15 +552,43 @@ function saveCustomColor(name, hex){
   CUSTOM_COMMODITY_COLORS[name.trim().toLowerCase()]=hex;
   try{ localStorage.setItem("dispatch_commodity_colors", JSON.stringify(CUSTOM_COMMODITY_COLORS)); }catch(e){}
 }
-/* returns a CSS colour VALUE for a commodity (custom hex wins, else the
-   matched palette var resolved to its value, else grey). */
-function commodityVar(c){
-  const s=(c||"").toLowerCase().trim();
-  // exact custom-colour match (by commodity name, grade stripped)
-  const base = s.split(" — ")[0].split(" - ")[0].trim();
-  if(CUSTOM_COMMODITY_COLORS[base]) return CUSTOM_COMMODITY_COLORS[base];
-  if(CUSTOM_COMMODITY_COLORS[s])    return CUSTOM_COMMODITY_COLORS[s];
-  for(const row of COMMODITY_COLORS){ if(row.match.some(m=>s.includes(m))) return `var(${row.var})`; }
+/* colour key helpers. A grade-specific override is stored under
+   "commodity|grade" (both lowercased); a whole-commodity override under
+   "commodity". commodityVar(commodity, grade) resolves in priority order:
+     1. custom synced colour for commodity|grade
+     2. custom synced colour for the commodity
+     3. built-in grade colour (Nugget pink, OAT2/3 lighter purple, …)
+     4. built-in commodity colour
+     5. grey (TBC) */
+function colorKey(commodity, grade){
+  const c=(commodity||"").toLowerCase().trim();
+  const g=(grade||"").toLowerCase().trim();
+  return g ? (c+"|"+g) : c;
+}
+function commodityVar(c, grade){
+  // the commodity text may already contain the grade ("Lentils - Nipper");
+  // split it out so colour resolution is consistent wherever it's called.
+  let commodity=(c||"").trim(), gr=(grade||"").trim();
+  if(!gr){
+    const parts=commodity.split(/\s*[—–-]\s*/);
+    if(parts.length>1){ commodity=parts[0].trim(); gr=parts.slice(1).join(" ").trim(); }
+  }
+  const cLow=commodity.toLowerCase().trim();
+  const gLow=gr.toLowerCase().trim();
+  // 1 + 2: custom synced overrides (grade first, then commodity)
+  if(gLow && CUSTOM_COMMODITY_COLORS[cLow+"|"+gLow]) return CUSTOM_COMMODITY_COLORS[cLow+"|"+gLow];
+  if(CUSTOM_COMMODITY_COLORS[cLow]) return CUSTOM_COMMODITY_COLORS[cLow];
+  // also allow a whole-string custom key (legacy)
+  const whole=(c||"").toLowerCase().trim();
+  if(CUSTOM_COMMODITY_COLORS[whole]) return CUSTOM_COMMODITY_COLORS[whole];
+  // 3: built-in grade colour
+  if(gLow){
+    for(const row of GRADE_COLORS){
+      if(cLow.includes(row.commodity) && gLow.includes(row.grade)) return `var(${row.var})`;
+    }
+  }
+  // 4: built-in commodity colour
+  for(const row of COMMODITY_COLORS){ if(row.match.some(m=>cLow.includes(m))) return `var(${row.var})`; }
   return "var(--c-tbc)";
 }
 
@@ -677,6 +727,35 @@ async function loadGrowers(){
   STATE.growers=dir;
   buildFarmList();
 }
+/* ---- shared commodity/grade colours (synced to everyone via the Other sheet) ----
+   Stored on the Colours tab as key→hex. Key is "commodity" or "commodity|grade".
+   These OVERRIDE the built-in colours, and are merged into CUSTOM_COMMODITY_COLORS. */
+const COLOUR_SYNC_URL = OTHER_URL;   // one canonical place for shared colours
+async function loadSharedColors(){
+  if(!COLOUR_SYNC_URL || COLOUR_SYNC_URL.startsWith("PASTE_")) return;
+  try{
+    const res=await fetch(COLOUR_SYNC_URL+"?colors=1&_cb="+Date.now(), {redirect:"follow"});
+    const data=await res.json();
+    if(data.ok && data.colors){
+      // sheet colours win over any stale per-browser value
+      Object.keys(data.colors).forEach(k=>{ CUSTOM_COMMODITY_COLORS[k.toLowerCase()]=data.colors[k]; });
+      try{ localStorage.setItem("dispatch_commodity_colors", JSON.stringify(CUSTOM_COMMODITY_COLORS)); }catch(e){}
+    }
+  }catch(e){ console.warn("[dispatch] colour load fail:", e); }
+}
+// change a commodity/grade colour for EVERYONE (writes to the shared sheet)
+function saveSharedColor(key, hex){
+  key=(key||"").trim().toLowerCase(); if(!key) return;
+  CUSTOM_COMMODITY_COLORS[key]=hex;                       // local immediately
+  try{ localStorage.setItem("dispatch_commodity_colors", JSON.stringify(CUSTOM_COMMODITY_COLORS)); }catch(e){}
+  render();                                               // repaint all blocks now
+  if(!COLOUR_SYNC_URL || COLOUR_SYNC_URL.startsWith("PASTE_")){ toast("Colour changed (this device — not synced)"); return; }
+  postAction(COLOUR_SYNC_URL, {action:"savecolor", key, hex}).then(r=>{
+    if(r&&r.ok){ toast("Colour updated for everyone"); }
+    else{ toast("Colour saved here, but didn't sync", true); }
+  }).catch(()=>toast("Colour saved here, but didn't sync", true));
+}
+
 // look up by farm/release name (the lead field). Falls back to grower name.
 function growerByFarm(farm){
   if(!farm) return null;
@@ -777,6 +856,7 @@ async function loadAll(){
   }
   setSynced("Loading…", null);
   loadGrowers();   // refresh the grower directory in the background
+  loadSharedColors().then(()=>render());   // pull shared colours, then repaint
   const all=[];
   let anyFail=false, lastErr="";
   // fetch each UNIQUE sheet url once (several booking types can share one sheet)
@@ -1157,7 +1237,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const dur=j.duration||DEFAULT_DUR;
   const top=((j.tipMin-DAY_START*60)/60)*HOUR_PX;
   const h=Math.max(16,(dur/60)*HOUR_PX)-1;
-  const cvar=commodityVar(j.commodity);
+  const cvar=commodityVar(j.commodity, j.grade);
   // solid when Confirmed, striped (scheduled) when pencilled-in/blank
   const cancelled = /^cancel/i.test(j.apptStatus||"");
   const confirmed = /^conf/i.test(j.apptStatus||"") || j.arrived;
@@ -1581,21 +1661,34 @@ function renderEditor(){
   const dateISO = EDIT.date ? isoDate(EDIT.date) : "";
 
   const servicesHTML = EDIT.services.map((sv,idx)=>{
-    // commodity select options
-    const selVal = sv.grade ? (sv.commodity+" — "+sv.grade) : sv.commodity;
-    const blankSel = selVal ? "" : " selected";
+    // commodity select options. Match the stored commodity+grade to an option
+    // tolerantly: the grade may be baked into the commodity text ("Lentils - Nipper")
+    // or sit in sv.grade, and dashes may be hyphen or em-dash. normalise both sides.
+    const norm = (x)=> (x||"").toLowerCase().replace(/\s*[—–-]\s*/g," - ").replace(/\s+/g," ").trim();
+    const selRaw = sv.grade ? (sv.commodity+" — "+sv.grade) : (sv.commodity||"");
+    const selNorm = norm(selRaw);
+    // find the catalogue option that matches (exact-normalised, else commodity+grade parts)
+    let matched = opts.find(o=> norm(o.label)===selNorm);
+    if(!matched && sv.commodity){
+      const cN=norm(sv.commodity), gN=norm(sv.grade);
+      matched = opts.find(o=> norm(o.commodity)===cN && norm(o.grade)===gN)
+             || opts.find(o=> norm(o.commodity)===cN && !gN);   // commodity only
+    }
+    const selLabel = matched ? matched.label : "";
+    const blankSel = selLabel ? "" : " selected";
     const optionsHTML =
       `<option value=""${blankSel} disabled>Commodity…</option>` +
       opts.map(o=>
-      `<option value="${esc(o.label)}" ${o.label===selVal?"selected":""}>${esc(o.label)}</option>`
+      `<option value="${esc(o.label)}" ${o.label===selLabel?"selected":""}>${esc(o.label)}</option>`
     ).join("") + `<option value="__ADD__">+ Add commodity…</option>`;
-    const cvar = commodityVar(sv.commodity);
+    const cvar = commodityVar(sv.commodity, sv.grade);
     const durOpts = [15,30,45,60,75,90,120,180].map(m=>
       `<option value="${m}" ${(+sv.duration===m)?"selected":""}>${m} min</option>`).join("");
     return `<div class="service" data-idx="${idx}">
       ${EDIT.services.length>1?`<button class="rm" title="Remove" onclick="removeService(${idx})">×</button>`:""}
       <div class="srow">
-        <span class="swatch-dot" style="background:${cvar}"></span>
+        <button type="button" class="swatch-dot swatch-btn" style="background:${cvar}"
+                title="Change this commodity's colour (for everyone)" onclick="openColorPicker(${idx})"></button>
         <select class="commodity-sel" onchange="onCommodityChange(${idx},this)">${optionsHTML}</select>
         <select class="grid-sel" onchange="EDIT.services[${idx}].grid=+this.value">
           <option value="1" ${(+sv.grid===1)?"selected":""}>GRID 1</option>
@@ -1813,6 +1906,81 @@ function onCommodityChange(idx, sel){
   const o=commodityOptions().find(x=>x.label===sel.value);
   if(o){ EDIT.services[idx].commodity=o.commodity; EDIT.services[idx].grade=o.grade; }
   renderEditor(); // refresh swatch colour
+}
+
+/* ---- in-editor colour change (wholesale, synced to everyone) ---- */
+function openColorPicker(idx){
+  syncEditFields();
+  const sv=EDIT.services[idx]; if(!sv) return;
+  const commodity=(sv.commodity||"").trim();
+  const grade=(sv.grade||"").trim();
+  if(!commodity){ toast("Pick a commodity first", true); return; }
+  EDIT._colIdx=idx;
+  // default scope: if there's a grade, recolour just this grade; else whole commodity
+  EDIT._colScope = grade ? "grade" : "commodity";
+  const curHex = resolveHex(commodityVar(commodity, grade));
+  EDIT._colHex = curHex;
+  const sw = COMMODITY_PALETTE.map(c=>
+    `<button type="button" class="col-sw" data-c="${c}" style="background:${c}" onclick="pickColor('${c}')"></button>`
+  ).join("");
+  const scopeRow = grade ? `
+      <div class="col-scope">
+        <label><input type="radio" name="colScope" value="grade" checked onchange="EDIT._colScope='grade'">
+          Just <b>${esc(commodity)} — ${esc(grade)}</b></label>
+        <label><input type="radio" name="colScope" value="commodity" onchange="EDIT._colScope='commodity'">
+          All <b>${esc(commodity)}</b></label>
+      </div>` : ``;
+  document.getElementById("editModal").innerHTML=`
+    <div class="m-head"><span class="m-title">Change colour</span>
+      <button class="m-close" onclick="renderEditor()">×</button></div>
+    <div class="m-body">
+      <div class="col-note">This changes the colour <b>everywhere</b> for everyone.</div>
+      ${scopeRow}
+      <div style="margin-top:12px;font-size:12.5px;font-weight:700;color:var(--ink-dim)">Pick a colour</div>
+      <div class="col-grid" id="colGrid">${sw}</div>
+      <div class="m-field" style="margin-top:12px;align-items:center;gap:10px">
+        <span class="ic">🎨</span>
+        <span style="font-size:13px;color:var(--ink-dim)">Or choose exactly:</span>
+        <input type="color" id="colExact" value="${curHex}" onchange="pickColor(this.value)"
+               style="width:46px;height:30px;border:1px solid var(--grid-line-strong);border-radius:8px;background:none;cursor:pointer">
+      </div>
+    </div>
+    <div class="m-foot">
+      <span class="spacer"></span>
+      <button class="btn btn-cancel" onclick="renderEditor()">Cancel</button>
+      <button class="btn btn-save" onclick="applyColorChange()">Apply to everyone</button>
+    </div>`;
+  setTimeout(()=>pickColor(EDIT._colHex),0);
+}
+function pickColor(hex){
+  EDIT._colHex=hex;
+  document.querySelectorAll("#colGrid .col-sw").forEach(b=>{
+    b.classList.toggle("on", (b.dataset.c||"").toLowerCase()===String(hex).toLowerCase());
+  });
+  const ex=document.getElementById("colExact"); if(ex && /^#[0-9a-f]{6}$/i.test(hex)) ex.value=hex;
+}
+function applyColorChange(){
+  const idx=EDIT._colIdx; const sv=EDIT.services[idx]; if(!sv){ renderEditor(); return; }
+  const commodity=(sv.commodity||"").trim().toLowerCase();
+  const grade=(sv.grade||"").trim().toLowerCase();
+  const hex=EDIT._colHex;
+  const key=(EDIT._colScope==="grade" && grade) ? (commodity+"|"+grade) : commodity;
+  saveSharedColor(key, hex);   // writes shared + repaints board
+  renderEditor();              // back to the edit form (swatch now updated)
+}
+/* resolve a CSS value like "var(--c-oats)" or "#aabbcc" to a concrete #hex
+   (needed to prefill the native colour input) */
+function resolveHex(cssVal){
+  if(!cssVal) return "#cccccc";
+  if(/^#[0-9a-f]{6}$/i.test(cssVal)) return cssVal;
+  try{
+    const probe=document.createElement("span");
+    probe.style.color=cssVal; document.body.appendChild(probe);
+    const rgb=getComputedStyle(probe).color; probe.remove();
+    const m=rgb.match(/(\d+),\s*(\d+),\s*(\d+)/);
+    if(m){ const h=(n)=>(+n).toString(16).padStart(2,"0"); return "#"+h(m[1])+h(m[2])+h(m[3]); }
+  }catch(e){}
+  return "#cccccc";
 }
 
 /* palette of colours staff can choose for a new commodity */
