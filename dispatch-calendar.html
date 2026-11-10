@@ -412,7 +412,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.0</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.1</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -727,12 +727,18 @@ function guessYear(mon,day){
 function parseTimeMin(s){
   if(!s) return null;
   s=String(s).trim();
-  // Google's "empty time" placeholder (date serial 0) → treat as NO time,
-  // so these rows don't render as bogus midnight blocks
-  if(/1899/.test(s) || /^30\/12\/1899/.test(s)) return null;
-  // ISO datetime → take the time part
+  // A time typed straight into Google Sheets comes back on the 1899-12-30
+  // epoch date (e.g. "1899-12-30T13:00:00") — that's a REAL time, so read it.
+  // Only the midnight placeholder (00:00:00) means "no time set" → hide it.
+  const is1899 = /1899/.test(s) || /30\/12\/1899/.test(s);
+  // ISO / sheet datetime → take the HH:mm time part
   let m=s.match(/T(\d{2}):(\d{2})/);
-  if(m) return (+m[1])*60 + (+m[2]);
+  if(m){
+    const mins=(+m[1])*60 + (+m[2]);
+    if(is1899 && mins===0) return null;   // 1899 midnight = empty-time placeholder
+    return mins;
+  }
+  if(is1899) return null;                 // 1899 with no parseable time → no time
   m=s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])?/);
   if(!m) return null;
   let h=+m[1], min=+m[2], ap=(m[3]||"").toUpperCase();
