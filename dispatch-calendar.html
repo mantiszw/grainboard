@@ -430,7 +430,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.6</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.8</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -669,6 +669,7 @@ let STATE = {
   hideCancelled: false,  // cancelled loads SHOWN by default; toggle hides them
   loadedOnce: false,
   growers: {},           // name(lower) → {site,release,driver,phone,maps,commodity,grade}
+  drivers: {},           // sheetKey → [driver names] (from each sheet's Driver dropdown)
 };
 
 /* ---------- grower directory ----------
@@ -743,6 +744,28 @@ async function loadSharedColors(){
     }
   }catch(e){ console.warn("[dispatch] colour load fail:", e); }
 }
+/* ---- per-transporter driver lists (from each sheet's Driver dropdown) ----
+   Keyed by sheetKey. Sheets that share a URL (the "Other" sheet) share a list. */
+async function loadDrivers(){
+  const live = SHEETS.filter(s=>s.url && !s.url.startsWith("PASTE_"));
+  // one fetch per unique URL, then map the result onto every sheetKey using it
+  const byUrl={};
+  live.forEach(s=>{ (byUrl[s.url]=byUrl[s.url]||[]).push(s.key); });
+  await Promise.all(Object.keys(byUrl).map(async url=>{
+    try{
+      const res=await fetch(url+"?drivers=1&_cb="+Date.now(), {redirect:"follow"});
+      const data=await res.json();
+      if(data.ok && Array.isArray(data.drivers)){
+        byUrl[url].forEach(key=>{ STATE.drivers[key]=data.drivers.slice(); });
+      }
+    }catch(e){ console.warn("[dispatch] driver load fail:", url, e); }
+  }));
+}
+// the driver option list for a given transporter (sheetKey), always an array
+function driversFor(sheetKey){
+  return (STATE.drivers && STATE.drivers[sheetKey]) ? STATE.drivers[sheetKey] : [];
+}
+
 // change a commodity/grade colour for EVERYONE (writes to the shared sheet)
 function saveSharedColor(key, hex){
   key=(key||"").trim().toLowerCase(); if(!key) return;
@@ -856,6 +879,7 @@ async function loadAll(){
   }
   setSynced("Loading…", null);
   loadGrowers();   // refresh the grower directory in the background
+  loadDrivers();   // refresh per-transporter driver lists in the background
   loadSharedColors().then(()=>render());   // pull shared colours, then repaint
   const all=[];
   let anyFail=false, lastErr="";
@@ -1716,6 +1740,9 @@ function renderEditor(){
   // transporter. Changing it on an existing load MOVES it to that sheet.
   // A colour chip mirrors the block ribbon.
   const curMeta = sheetMeta(EDIT.sheetKey);
+  // driver dropdown options for THIS transporter (free-typing still allowed)
+  const driverOptionsHTML = driversFor(EDIT.sheetKey)
+    .map(d=>`<option value="${esc(d)}"></option>`).join("");
   const pickerHTML = `
       <div class="m-field">
         <span class="ic">🚚</span>
@@ -1807,6 +1834,13 @@ function renderEditor(){
         <input class="lineinput" id="editPhone" type="text" value="${esc(EDIT.phone||'')}" placeholder="Phone"
                inputmode="tel" oninput="EDIT.phone=this.value">
       </div>
+      <div class="m-field">
+        <span class="ic">🚛</span>
+        <input class="lineinput" id="editDriver" type="text" value="${esc(EDIT.driver||'')}"
+               list="driverList" autocomplete="off" placeholder="Driver — pick ${esc(curMeta.short)} or type a name"
+               oninput="EDIT.driver=this.value">
+        <datalist id="driverList">${driverOptionsHTML}</datalist>
+      </div>
       ${(!isNew && otherSameGrower>0) ? `
       <label class="apply-all">
         <input type="checkbox" id="applyAllGrower">
@@ -1864,11 +1898,13 @@ function onFarmType(farm){
   }
 }
 function onSheetChange(key){
+  syncEditFields();                 // keep what's typed before re-rendering
   const s=sheetByKey(key); if(!s) return;
   EDIT.sheetKey=s.key; EDIT.url=s.url;
   const chip=document.getElementById("editSheetChip");
   const m=sheetMeta(key);
   if(chip){ chip.style.background=m.color; chip.textContent=m.short; }
+  renderEditor();                   // refresh the driver dropdown for the new transporter
 }
 function syncEditFields(){
   if(!EDIT) return;
@@ -1884,6 +1920,8 @@ function syncEditFields(){
   if(contactEl) EDIT.contact=contactEl.value;
   const phoneEl=document.getElementById("editPhone");
   if(phoneEl) EDIT.phone=phoneEl.value;
+  const driverEl=document.getElementById("editDriver");
+  if(driverEl) EDIT.driver=driverEl.value;
   const sheetEl=document.getElementById("editSheet");
   if(sheetEl && sheetEl.tagName==="SELECT"){ const s=sheetByKey(sheetEl.value); if(s){ EDIT.sheetKey=s.key; EDIT.url=s.url; } }
   // per-service live inputs (time field + the selects' current values)
@@ -2147,9 +2185,10 @@ function saveAppt(){
         if(editedIds.has(j.id)) return;                 // skip the ones we just edited
         if((j.site||"").trim().toLowerCase()!==origName) return;
         if(/^tmp/.test(j.id||"")) return;               // skip not-yet-saved
-        // update the grower-level details on this other booking
-        j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.maps=maps; j.driver=driver;
-        const f={ site, release, contact, phone, maps, driver };
+        // update the grower-level details on this other booking.
+        // NOTE: driver is per-LOAD (different trucks), so it is NOT propagated.
+        j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.maps=maps;
+        const f={ site, release, contact, phone, maps };
         jobs.push(postAction(j.url,{action:"update",id:j.id,fields:f}));
       });
     }
