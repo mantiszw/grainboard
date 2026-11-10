@@ -370,6 +370,12 @@
     padding:8px 12px;font-size:13px;font-weight:700;color:var(--ink-dim);cursor:pointer;width:100%;margin-bottom:6px}
   .add-service:hover{background:#f0f0f3}
   .status-row{display:flex;align-items:center;gap:8px;margin-top:10px}
+  /* "apply to all bookings for this grower" — off by default, rarely used */
+  .apply-all{display:flex;align-items:flex-start;gap:8px;margin:2px 0 14px;padding:8px 10px;
+    background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;cursor:pointer;
+    font-size:12.5px;line-height:1.35;color:#9a3412}
+  .apply-all input{margin-top:1px;flex:none;width:15px;height:15px;cursor:pointer}
+  .apply-all b{font-weight:800}
   .note-field{margin-top:14px}
   .note-field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-dim);margin-bottom:5px}
   .note-field .note-has{color:#c0392b;font-weight:800;margin-left:4px}
@@ -412,7 +418,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.1</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.2</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -1589,6 +1595,12 @@ function renderEditor(){
   const apptStatus = (EDIT.services[0] && EDIT.services[0].apptStatus) || "Pencilled";
   const isNew = !!EDIT.isNew;
   const isBusy = !!EDIT.isBusy;
+  // how many OTHER bookings share this grower name (the "apply to all" scope)
+  const _gName = (EDIT.origSite||EDIT.site||"").trim().toLowerCase();
+  const _editedSet = new Set(EDIT.origIds||[]);
+  const otherSameGrower = _gName ? STATE.jobs.filter(j=>
+        !_editedSet.has(j.id) && !/^tmp/.test(j.id||"") &&
+        (j.site||"").trim().toLowerCase()===_gName).length : 0;
   const title = isBusy ? (isNew?"Add busy time":"Busy time")
                        : (isNew ? "New booking" : "Edit appointment");
 
@@ -1687,6 +1699,11 @@ function renderEditor(){
         <input class="lineinput" id="editPhone" type="text" value="${esc(EDIT.phone||'')}" placeholder="Phone"
                inputmode="tel" oninput="EDIT.phone=this.value">
       </div>
+      ${(!isNew && otherSameGrower>0) ? `
+      <label class="apply-all">
+        <input type="checkbox" id="applyAllGrower">
+        <span>Apply grower details to all <b>${otherSameGrower}</b> other booking${otherSameGrower>1?'s':''} for this grower</span>
+      </label>` : ``}
       ${servicesHTML}
       <button class="add-service" onclick="addService()">+ Add another service (split load)</button>
       <div class="status-row">
@@ -1888,6 +1905,10 @@ function saveAppt(){
   const propIsNew   = !!EDIT.isNew;
   const propOrigName= (EDIT.origSite||"").trim().toLowerCase();
   const propEditedIds = new Set(EDIT.origIds||[]);
+  // propagate to this grower's OTHER bookings ONLY if the user ticked the box
+  // (default OFF — editing one booking must not silently rewrite the rest)
+  const applyAllEl = document.getElementById("applyAllGrower");
+  const propApplyAll = !!(applyAllEl && applyAllEl.checked);
 
   // ---- OPTIMISTIC: update local state + UI immediately, write in background ----
   // 1. apply deletes locally
@@ -1932,10 +1953,10 @@ function saveAppt(){
       commodity:(services[0]&&services[0].commodity)||"", grade:(services[0]&&services[0].grade)||"" });
   }
   // ---- propagate the grower edit to this grower's OTHER bookings ----
-  // match by the ORIGINAL grower name (exact, case-insensitive). If the grower
-  // name or its details changed, update every other booking for that grower so
-  // they stay consistent across the board.
-  if(!propIsNew){
+  // ONLY when the user ticked "apply to all bookings for this grower". By
+  // default a save changes just THIS booking. Matches by the ORIGINAL grower
+  // name (exact, case-insensitive).
+  if(!propIsNew && propApplyAll){
     const origName=propOrigName;
     const editedIds=propEditedIds;
     if(origName){
