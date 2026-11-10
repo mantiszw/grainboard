@@ -267,8 +267,15 @@
   .ev.busy .tm{opacity:.7}
   .cxlbl{font-size:12px;font-weight:600;color:var(--ink-dim);display:flex;align-items:center;gap:5px;white-space:nowrap;cursor:pointer}
   .cxlbl input{cursor:pointer}
-  /* hide sub-lines on short (15-min) blocks; show on taller ones */
+  /* very short (≈15-min) blocks: name only */
   .ev.compact .sub, .ev.compact .tm{display:none}
+  /* snug (≈30-min) blocks: keep name + commodity readable, drop the time line
+     (the block's position already shows the time; the tooltip has it too) */
+  .ev.snug{padding-top:1px;padding-bottom:1px}
+  .ev.snug .title{font-size:10.5px;line-height:1.15;padding-right:46px}
+  .ev.snug .sub{font-size:9px;line-height:1.1}
+  .ev.snug .tm{display:none}
+  .ev.snug .ev-driver{font-size:6.5px;padding:0 3px}
   /* resize handle on the bottom edge */
   .resize-handle{
     position:absolute;left:0;right:0;bottom:0;height:7px;cursor:ns-resize;
@@ -430,7 +437,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.8</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.9</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -1279,7 +1286,10 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const driver = (j.driver||"").trim();
   const timeRange = `${minToLabel(j.tipMin)} – ${minToLabel(j.tipMin+dur)}`;
   const line3 = timeRange;
-  const compact = h < 34 ? " compact" : "";
+  // height-based density: very short → name only (compact); ~30-min → name +
+  // commodity, no time line (snug); taller → full three lines.
+  const compact = h < 26 ? " compact" : "";
+  const snug = (!compact && h < 46) ? " snug" : "";
   // geometry: a single-grid view gives the block the FULL column width;
   // otherwise it sits in its grid half (0% or 50%)
   const gridBase = fullWidth ? 0 : (gridNo===2 ? 50 : 0);
@@ -1305,7 +1315,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   // per-booking visible tag (e.g. "25t") — shows as a pill beside the name, this load only
   const tag=(j.tag||"").trim();
   const tagPill = tag ? `<span class="ev-tag" title="${esc(tag)}">${esc(tag)}</span>` : "";
-  return `<div class="ev ${cls}${compact}${dark}${clash?' clash':''}" data-id="${j.id}" data-sheet="${j.sheetKey}"
+  return `<div class="ev ${cls}${compact}${snug}${dark}${clash?' clash':''}" data-id="${j.id}" data-sheet="${j.sheetKey}"
        data-stack="${cols>1?1:0}" data-z="${z}"
        title="${esc(line1)}${tag?(' ['+esc(tag)+']'):''} — ${esc(commGrade)} · ${esc(meta.name)}${driver?(' · '+esc(driver)):''}${note?(' · 📝 '+esc(note)):''} · ${timeRange} · Grid ${gridNo}${clash?' · double booking':''}"
        style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${width}% - 2px);z-index:${z};--evc:${cvar};--gb:${gridBase}%;--gs:${gridSpan}%">
