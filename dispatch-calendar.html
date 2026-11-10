@@ -418,7 +418,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.4</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.5</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -1093,6 +1093,17 @@ function doRepeat(){
 function createBookingAt(base, date, min, grid){
   const url=base.url, sheetKey=base.sheetKey;
   const dateISO=isoDate(date);
+  // belt-and-braces: if the snapshot lost grower contact details, recover them
+  // from the grower directory (by farm/business name, then grower name)
+  if(!base.contact || !base.phone){
+    const g = growerByFarm(base.release) || growerByFarm(base.site) ||
+              (STATE.growers && STATE.growers[String(base.site||"").trim().toLowerCase()]) || null;
+    if(g){
+      if(!base.contact && g.contact) base.contact=g.contact;
+      if(!base.phone   && g.phone)   base.phone=g.phone;
+      if(!base.maps    && g.maps)    base.maps=g.maps;
+    }
+  }
   const anchor=base.services[0] ? parseTimeMin(base.services[0].time) : min;
   const writes=[];
   base.services.forEach(sv=>{
