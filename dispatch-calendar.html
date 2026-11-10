@@ -418,7 +418,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.3</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.4</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -978,6 +978,9 @@ function attachEmptyClick(){
 function startDuplicate(){ beginPlacing("copy"); }
 function startReschedule(){ beginPlacing("move"); }
 function beginPlacing(mode){
+  // pull the latest on-screen values into EDIT first, so the snapshot carries
+  // the current contact / phone / grower details (not just what was there at open)
+  syncEditFields();
   // snapshot the booking (all its split services) before closing the editor
   const snap={
     sheetKey:EDIT.sheetKey, url:EDIT.url, site:EDIT.site, release:EDIT.release||"",
