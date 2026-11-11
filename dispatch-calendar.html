@@ -273,8 +273,10 @@
      (the block's position already shows the time; the tooltip has it too) */
   .ev.snug{padding-top:1px;padding-bottom:1px}
   .ev.snug .title{font-size:10.5px;line-height:1.15;padding-right:46px}
-  .ev.snug .sub{font-size:9px;line-height:1.1}
-  .ev.snug .tm{display:none}
+  .ev.snug .sub{font-size:9px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ev.snug .tm{display:none}            /* the separate time line is merged into .sub */
+  .ev.snug .sub .sub-tm{opacity:.75;font-weight:500}
+  .ev.snug .sub .sub-tm::before{content:", ";opacity:.75}
   .ev.snug .ev-driver{font-size:6.5px;padding:0 3px}
   /* resize handle on the bottom edge */
   .resize-handle{
@@ -437,7 +439,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v1.9</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.2</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -934,7 +936,7 @@ function normalise(r, sheet){
   return {
     id:r.id, sheetKey:key, sheetName:sheetMeta(key).name, url:sheet.url,
     site:r.site||"", commodity:r.commodity||"", release:r.release||"",
-    status:r.status||"", driver:r.driver||"", note:r.note||"", tag:r.tag||"",
+    status:r.status||"", driver:r.driver||"", note:r.note||"", notes:r.notes||"", tag:r.tag||"",
     grid:grid,                                    // blank/anything else → Grid 1
     grade:r.grade||"",
     apptStatus:r.apptStatus||"",
@@ -1310,7 +1312,9 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
     ? ""
     : `<span class="ev-trans" style="background:${meta.color}" title="${esc(meta.name)}">${esc(meta.short)}</span>`;
   const driverBadge = driver ? `<span class="ev-driver">${esc(driver)}</span>` : "";
-  const note=(j.note||"").trim();
+  // The envelope on the board now reflects OUR team note (the "Notes" column),
+  // NOT the "Note" column Marleys use for their own load confirmations.
+  const note=(j.notes||"").trim();
   const flag = note ? `<span class="ev-flag" title="${esc(note)}">📩</span>` : "";
   // per-booking visible tag (e.g. "25t") — shows as a pill beside the name, this load only
   const tag=(j.tag||"").trim();
@@ -1323,7 +1327,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
     ${flag}
     ${cancelled?`<span class="cxtag">CANCELLED</span>`:driverBadge}
     <div class="title">${esc(line1)}${tagPill}</div>
-    <div class="sub">${esc(commGrade)}</div>
+    <div class="sub">${esc(commGrade)}${snug?`<span class="sub-tm">${esc(timeRange)}</span>`:""}</div>
     <div class="tm">${line3}</div>
     <div class="resize-handle"></div>
   </div>`;
@@ -1510,19 +1514,34 @@ async function onUp(e){
 function dateFromKey(k){ const y=Math.floor(k/10000),m=Math.floor((k%10000)/100),d=k%100; return new Date(y,m,d); }
 function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
+let PENDING_WRITES=0;   // in-flight sheet writes; auto-refresh waits for these
 async function writeBack(job, payload){
   if(!job.url || job.url.startsWith("PASTE_")){
     return true; // demo mode — pretend success
   }
+  // one write, with a generous timeout; retried once on failure, because
+  // Apps Script can be slow/flaky — a single hiccup shouldn't revert the move.
+  async function attempt(){
+    const ctrl=new AbortController();
+    const to=setTimeout(()=>ctrl.abort(), 25000);   // 25s ceiling per try
+    try{
+      const res=await fetch(job.url,{
+        method:"POST",
+        body:JSON.stringify({action:"update", ...payload}),
+        headers:{"Content-Type":"text/plain;charset=utf-8"}, // avoids CORS preflight
+        redirect:"follow",
+        signal:ctrl.signal
+      });
+      const data=await res.json();
+      return !!data.ok;
+    }catch(e){ console.warn("[dispatch] writeBack fail:", e); return false; }
+    finally{ clearTimeout(to); }
+  }
+  PENDING_WRITES++;
   try{
-    const res=await fetch(job.url,{
-      method:"POST",
-      body:JSON.stringify(payload),
-      headers:{"Content-Type":"text/plain;charset=utf-8"} // avoids CORS preflight to Apps Script
-    });
-    const data=await res.json();
-    return !!data.ok;
-  }catch(e){ return false; }
+    if(await attempt()) return true;
+    return await attempt();   // one retry
+  }finally{ PENDING_WRITES=Math.max(0,PENDING_WRITES-1); }
 }
 
 /* richer POST that returns the full response (for update/create/delete). */
@@ -1531,11 +1550,15 @@ async function postAction(url, body){
     // demo mode — fake a success, inventing an id for create
     return { ok:true, id:(body.action==="create"? "demo"+Math.random().toString(36).slice(2,8): body.id), created:body.action==="create", deleted:body.action==="delete" };
   }
+  PENDING_WRITES++;
+  const ctrl=new AbortController();
+  const to=setTimeout(()=>ctrl.abort(), 25000);
   try{
     const res=await fetch(url,{ method:"POST", body:JSON.stringify(body),
-      headers:{"Content-Type":"text/plain;charset=utf-8"} });
+      headers:{"Content-Type":"text/plain;charset=utf-8"}, redirect:"follow", signal:ctrl.signal });
     return await res.json();
   }catch(e){ return { ok:false, error:String(e) }; }
+  finally{ clearTimeout(to); PENDING_WRITES=Math.max(0,PENDING_WRITES-1); }
 }
 function sheetByKey(key){ return SHEETS.find(s=>s.key===key); }
 
@@ -1566,7 +1589,7 @@ function openEditor(job){
     origUrl: job.url,
     origSite: job.site,           // remember the grower name, to propagate an edit to its other bookings
     site: job.site,
-    release: job.release||"", contact: job.contact||"", phone: job.phone||"", maps: job.maps||"", driver: job.driver||"", note: job.note||"", tag: job.tag||"",
+    release: job.release||"", contact: job.contact||"", phone: job.phone||"", maps: job.maps||"", driver: job.driver||"", note: job.note||"", notes: job.notes||"", tag: job.tag||"",
     date: job.tipDate,
     services: siblings.map(j=>({
       id:j.id, commodity:j.commodity||"", grade:j.grade||"",
@@ -1600,7 +1623,7 @@ function openNewBooking(date, min, grid){
   EDIT = {
     isNew:true,
     sheetKey: sheet.key, url: sheet.url,
-    site:"", release:"", contact:"", phone:"", maps:"", driver:"", note:"", tag:"", date,
+    site:"", release:"", contact:"", phone:"", maps:"", driver:"", note:"", notes:"", tag:"", date,
     services:[{ id:null, commodity:"", grade:"", grid, time:minToSheetTime(min),
                 duration:DEFAULT_DUR, apptStatus:"Pencilled" }],
     origIds:[],
@@ -1865,8 +1888,8 @@ function renderEditor(){
         </div>
       </div>
       <div class="note-field">
-        <label for="editNote">📝 Note ${EDIT.note?'<span class="note-has">• flagged</span>':''}</label>
-        <textarea id="editNote" rows="2" placeholder="Add a note for the lab / staff (shows a 📩 icon on the booking)" oninput="EDIT.note=this.value">${esc(EDIT.note||'')}</textarea>
+        <label for="editNote">📝 Team note ${EDIT.notes?'<span class="note-has">• 📩 shown</span>':''}</label>
+        <textarea id="editNote" rows="2" placeholder="Note for our team (shows a 📩 icon on the booking)" oninput="EDIT.notes=this.value">${esc(EDIT.notes||'')}</textarea>
       </div>
     </div>
     ${isNew?"":`
@@ -1923,7 +1946,7 @@ function syncEditFields(){
   const relEl=document.getElementById("editRelease");
   if(relEl) EDIT.release=relEl.value;
   const noteEl=document.getElementById("editNote");
-  if(noteEl) EDIT.note=noteEl.value;
+  if(noteEl) EDIT.notes=noteEl.value;   // the editor textarea is OUR team note ("Notes" column)
   const tagEl=document.getElementById("editTag");
   if(tagEl) EDIT.tag=tagEl.value;
   const contactEl=document.getElementById("editContact");
@@ -2126,7 +2149,8 @@ function saveAppt(){
   const phone=(EDIT.phone||"").trim();
   const maps=(EDIT.maps||"").trim();
   const driver=(EDIT.driver||"").trim();
-  const note=(EDIT.note||"").trim();
+  const note=(EDIT.note||"").trim();     // Marleys' "Note" column — preserved, not edited here
+  const notes=(EDIT.notes||"").trim();   // our team note — the "Notes" column + 📩 on board
   const tag=(EDIT.tag||"").trim();
   const dateISO = EDIT.date ? isoDate(EDIT.date) : "";
   const tipDate = EDIT.date;
@@ -2149,14 +2173,14 @@ function saveAppt(){
     const tmin=parseTimeMin(sv.time);
     if(sv.id){
       const j=STATE.jobs.find(x=>x.id===sv.id);
-      if(j){ j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.maps=maps; j.driver=driver; j.note=note; j.tag=tag;
+      if(j){ j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.maps=maps; j.driver=driver; j.note=note; j.notes=notes; j.tag=tag;
              j.tipDate=tipDate; j.tipMin=tmin; j.grid=+sv.grid;
              j.duration=+sv.duration; j.commodity=sv.commodity; j.grade=sv.grade; j.apptStatus=sv.apptStatus; }
     }else{
       // temporary local job until the sheet gives it a real id
       sv._tempId="tmp"+Math.random().toString(36).slice(2,9);
       STATE.jobs.push({ id:sv._tempId, sheetKey, url, site, commodity:sv.commodity, grade:sv.grade,
-        release, contact, phone, maps, status:"", driver, note, tag, grid:+sv.grid, duration:+sv.duration,
+        release, contact, phone, maps, status:"", driver, note, notes, tag, grid:+sv.grid, duration:+sv.duration,
         apptStatus:sv.apptStatus, tipDate, tipMin:tmin, arrived:false });
     }
   });
@@ -2168,7 +2192,9 @@ function saveAppt(){
   const jobs=[];
   toDelete.forEach(id=> jobs.push(postAction(url,{action:"delete",id})));
   services.forEach(sv=>{
-    const fields={ site, release, contact, phone, maps, driver, note, tag, tipDate:dateISO, tipTime:sv.time, grid:String(sv.grid),
+    // NOTE: we deliberately do NOT write `note` — that's Marleys' column, owned
+    // by them in the sheet. The board only writes `notes` (our team note).
+    const fields={ site, release, contact, phone, maps, driver, notes, tag, tipDate:dateISO, tipTime:sv.time, grid:String(sv.grid),
       duration:String(sv.duration), commodity:sv.commodity, grade:sv.grade, apptStatus:sv.apptStatus,
       transporter:sheetKey };   // tag the booking type (for shared "Other" sheet)
     if(sv.id){ jobs.push(postAction(url,{action:"update",id:sv.id,fields})); }
@@ -2227,7 +2253,8 @@ function moveToTransporter(){
   const release=(relEl?relEl.value:(EDIT.release||"")).trim();
   const contact=(EDIT.contact||"").trim(), phone=(EDIT.phone||"").trim();
   const maps=(EDIT.maps||"").trim(), driver=(EDIT.driver||"").trim();
-  const note=(EDIT.note||"").trim();
+  const note=(EDIT.note||"").trim();     // Marleys' column, carried on the local job only
+  const notes=(EDIT.notes||"").trim();   // our team note → written to "Notes"
   const tag=(EDIT.tag||"").trim();
   const dateISO=EDIT.date?isoDate(EDIT.date):"";
   const tipDate=EDIT.date;
@@ -2242,7 +2269,7 @@ function moveToTransporter(){
     const tmin=parseTimeMin(sv.time);
     sv._tempId="tmp"+Math.random().toString(36).slice(2,9);
     STATE.jobs.push({ id:sv._tempId, sheetKey:newKey, url:newUrl, site, release, contact, phone, maps,
-      status:"", driver, note, tag, commodity:sv.commodity, grade:sv.grade, grid:+sv.grid, duration:+sv.duration,
+      status:"", driver, note, notes, tag, commodity:sv.commodity, grade:sv.grade, grid:+sv.grid, duration:+sv.duration,
       apptStatus:sv.apptStatus||"Pencilled", tipDate, tipMin:tmin, arrived:false });
   });
   render(); toast(`Moving to ${newMeta.name}…`);
@@ -2252,7 +2279,7 @@ function moveToTransporter(){
   oldIds.forEach(id=> writes.push(postAction(oldUrl,{action:"delete",id})));
   // create on the new sheet
   services.forEach(sv=>{
-    const fields={ site, release, contact, phone, maps, driver, note, tag, tipDate:dateISO, tipTime:sv.time,
+    const fields={ site, release, contact, phone, maps, driver, notes, tag, tipDate:dateISO, tipTime:sv.time,
       grid:String(sv.grid), duration:String(sv.duration), commodity:sv.commodity, grade:sv.grade,
       apptStatus:sv.apptStatus||"Pencilled", transporter:newKey };
     writes.push(postAction(newUrl,{action:"create",fields}).then(r=>{
@@ -2409,6 +2436,7 @@ loadAll();
 // can't yank the UI out from under them.
 function autoRefresh(){
   const busy = (typeof EDIT!=="undefined" && EDIT) || drag || resize || PLACING
+    || PENDING_WRITES>0   // don't reload over an in-flight write (it would revert it)
     || document.getElementById("editBackdrop").style.display==="flex";
   if(!busy) loadAll();
 }
