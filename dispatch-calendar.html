@@ -387,7 +387,7 @@
   .gate-card button:hover{background:#1d4ed8}
   .gate-err{color:#dc2626;font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}
   /* multi-select: rubber-band box, highlighted & selected blocks, toolbar */
-  #bandBox{position:fixed;z-index:8000;border:1.5px solid #2563c9;
+  #bandBox, .band-box{position:fixed;z-index:8000;border:1.5px solid #2563c9;
     background:rgba(37,99,201,.12);border-radius:4px;pointer-events:none}
   .ev.band-hit{outline:2px solid #2563c9;outline-offset:-1px}
   .ev.selected{outline:2.5px solid #2563c9;outline-offset:-1px;
@@ -400,6 +400,16 @@
   #selBar button{background:#374151;color:#fff;border:none;border-radius:999px;
     padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
   #selBar button:hover{background:#4b5563}
+  #selBar button+button{margin-left:2px}
+  /* bulk commodity picker */
+  #bulkCommWrap{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.35)}
+  .bulk-card{background:#fff;border-radius:14px;padding:22px 22px 18px;width:100%;max-width:360px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);font-family:"Inter",system-ui,sans-serif}
+  .bulk-title{font-size:15px;font-weight:700;color:#1f2937;margin-bottom:14px}
+  .bulk-sel{width:100%;box-sizing:border-box;padding:10px 12px;font-size:14px;
+    border:1px solid #d1d5db;border-radius:9px;background:#fff}
+  .bulk-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
   .swatch-dot{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.15);flex-shrink:0}
   /* clickable swatch (opens the colour picker) — a touch bigger so it's tappable */
   .swatch-btn{width:16px;height:16px;border-radius:4px;padding:0;cursor:pointer;
@@ -467,7 +477,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.5</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.7</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -994,6 +1004,7 @@ function buildTransporterFilter(){
 function buildLegend(){/* legend removed */}
 
 function render(){
+  if(typeof killStrayBands==="function" && !band) killStrayBands();  // no stranded selection boxes
   const cal=document.getElementById("cal");
   document.getElementById("state").style.display = STATE.jobs.length||STATE.loadedOnce ? "none":"flex";
 
@@ -1411,15 +1422,75 @@ function updateSelBar(){
     bar=document.createElement("div"); bar.id="selBar";
     document.body.appendChild(bar);
   }
-  bar.innerHTML=`<b>${SELECTED.size}</b> selected — drag any one to move them together `+
+  bar.innerHTML=`<b>${SELECTED.size}</b> selected — drag to move, or `+
+    `<button onclick="openBulkCommodity()">Set commodity…</button>`+
     `<button onclick="clearSelection()">Clear</button>`;
 }
+/* ---- bulk-apply a commodity/grade to all selected bookings ---- */
+function openBulkCommodity(){
+  if(SELECTED.size<1) return;
+  const opts=commodityOptions();
+  const optsHTML=`<option value="" disabled selected>Choose commodity…</option>`+
+    opts.map(o=>`<option value="${esc(o.label)}">${esc(o.label)}</option>`).join("");
+  let m=document.getElementById("bulkCommWrap");
+  if(m) m.remove();
+  m=document.createElement("div"); m.id="bulkCommWrap";
+  m.innerHTML=`
+    <div class="bulk-card">
+      <div class="bulk-title">Set commodity for <b>${SELECTED.size}</b> selected booking${SELECTED.size>1?'s':''}</div>
+      <select id="bulkCommSel" class="bulk-sel">${optsHTML}</select>
+      <div class="bulk-actions">
+        <button class="btn btn-cancel" onclick="closeBulkCommodity()">Cancel</button>
+        <button class="btn btn-save" onclick="applyBulkCommodity()">Apply to ${SELECTED.size}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(m);
+}
+function closeBulkCommodity(){ const m=document.getElementById("bulkCommWrap"); if(m) m.remove(); }
+async function applyBulkCommodity(){
+  const sel=document.getElementById("bulkCommSel");
+  const chosen=sel && sel.value;
+  if(!chosen){ toast("Pick a commodity first", true); return; }
+  const o=commodityOptions().find(x=>x.label===chosen);
+  if(!o){ closeBulkCommodity(); return; }
+  const ids=[...SELECTED];
+  const items=ids.map(id=>STATE.jobs.find(j=>j.id===id)).filter(Boolean);
+  closeBulkCommodity();
+  // optimistic: apply commodity+grade locally, remember previous to revert
+  const prev=items.map(j=>({job:j, commodity:j.commodity, grade:j.grade}));
+  items.forEach(j=>{ j.commodity=o.commodity; j.grade=o.grade; });
+  render();
+  toast(`Setting ${items.length} to ${o.label}…`);
+  const writes=items.map(j=>writeBack(j,{ id:j.id, commodity:o.commodity, grade:o.grade }));
+  const results=await Promise.all(writes);
+  if(results.every(Boolean)){
+    toast(`${items.length} set to ${o.label}`);
+  }else{
+    prev.forEach(p=>{ p.job.commodity=p.commodity; p.job.grade=p.grade; });
+    render();
+    const n=results.filter(x=>!x).length;
+    toast(`${n} of ${items.length} didn't save — all reverted`, true);
+  }
+}
 /* ---- rubber-band selection: drag a box over empty space to select blocks ---- */
+// remove ANY stray band boxes and clear hover highlights (defensive cleanup)
+function killStrayBands(){
+  document.querySelectorAll("#bandBox, .band-box").forEach(el=>el.remove());
+  document.querySelectorAll(".ev.band-hit").forEach(el=>el.classList.remove("band-hit"));
+}
 function attachBandSelect(){
   const wrap=document.getElementById("calwrap");
   if(!wrap || wrap._bandBound) return;
   wrap._bandBound=true;
   wrap.addEventListener("pointerdown", onBandDown);
+}
+function endBand(){
+  // single teardown path — always runs, however the band ends
+  window.removeEventListener("pointermove", onBandMove);
+  window.removeEventListener("pointerup", onBandUp);
+  window.removeEventListener("pointercancel", onBandUp);
+  killStrayBands();
+  band=null;
 }
 function onBandDown(e){
   // only start a band on empty calendar space (not on a block, resize handle,
@@ -1429,54 +1500,55 @@ function onBandDown(e){
   if(drag||resize||PLACING||groupDrag) return;
   const col=e.target.closest(".daycol");
   if(!col) return;                       // only inside the day columns
-  const wrap=document.getElementById("calwrap");
-  const wr=wrap.getBoundingClientRect();
+  // clear any band that didn't tear down cleanly before starting a new one
+  if(band) endBand();
+  killStrayBands();
   band={ startX:e.clientX, startY:e.clientY, moved:false,
-         addTo:(e.ctrlKey||e.metaKey||e.shiftKey) };
+         addTo:(e.ctrlKey||e.metaKey||e.shiftKey), pid:e.pointerId };
   const boxEl=document.createElement("div");
-  boxEl.id="bandBox"; wrap.appendChild(boxEl);
-  band.box=boxEl; band.wrapRect=wr; band.wrap=wrap;
+  boxEl.className="band-box"; boxEl.id="bandBox";
+  document.body.appendChild(boxEl);      // on body so render() can't strand it
+  band.box=boxEl;
+  try{ e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId); band.capEl=e.target; }catch(_){}
   window.addEventListener("pointermove", onBandMove);
   window.addEventListener("pointerup", onBandUp);
+  window.addEventListener("pointercancel", onBandUp);
 }
 function onBandMove(e){
   if(!band) return;
   const dx=e.clientX-band.startX, dy=e.clientY-band.startY;
   if(Math.abs(dx)>4||Math.abs(dy)>4) band.moved=true;
-  if(!band.moved) return;
-  // position the band box (in page coords, fixed)
+  if(!band.moved){ if(band.box) band.box.style.display="none"; return; }
   const x1=Math.min(e.clientX,band.startX), y1=Math.min(e.clientY,band.startY);
   const x2=Math.max(e.clientX,band.startX), y2=Math.max(e.clientY,band.startY);
-  Object.assign(band.box.style,{position:"fixed",left:x1+"px",top:y1+"px",
-    width:(x2-x1)+"px",height:(y2-y1)+"px"});
-  // highlight blocks that intersect the band
+  if(band.box) Object.assign(band.box.style,{display:"block",position:"fixed",
+    left:x1+"px",top:y1+"px",width:(x2-x1)+"px",height:(y2-y1)+"px"});
+  // highlight blocks that intersect the band (viewport coords on both sides)
   document.querySelectorAll(".ev").forEach(ev=>{
-    if(ev.dataset.busy==="1") return;    // skip busy bands
+    if(ev.dataset.busy==="1") return;
     const r=ev.getBoundingClientRect();
     const hit=!(r.right<x1||r.left>x2||r.bottom<y1||r.top>y2);
     ev.classList.toggle("band-hit", hit);
   });
 }
 function onBandUp(e){
-  window.removeEventListener("pointermove", onBandMove);
-  window.removeEventListener("pointerup", onBandUp);
-  if(!band){ return; }
+  if(!band){ endBand(); return; }
   const wasDrag=band.moved;
-  if(band.box) band.box.remove();
+  const capEl=band.capEl, pid=band.pid;
+  // collect hits BEFORE teardown wipes the highlight class
+  const hits=wasDrag ? [...document.querySelectorAll(".ev.band-hit")] : [];
+  const addTo=band.addTo;
+  try{ capEl && capEl.releasePointerCapture && capEl.releasePointerCapture(pid); }catch(_){}
+  endBand();                              // removes box + listeners + clears band
   if(wasDrag){
-    if(!band.addTo) SELECTED.clear();
-    document.querySelectorAll(".ev.band-hit").forEach(ev=>{
-      ev.classList.remove("band-hit");
-      ev.classList.add("selected");
-      SELECTED.add(ev.dataset.id);
-    });
+    if(!addTo) SELECTED.clear();
+    hits.forEach(ev=>{ ev.classList.add("selected"); SELECTED.add(ev.dataset.id); });
     updateSelBar();
     // suppress the click that would otherwise open a new booking
-    band._suppressClick=true;
-    const killer=(ev)=>{ ev.stopPropagation(); ev.preventDefault(); window.removeEventListener("click",killer,true); };
+    const killer=(ce)=>{ ce.stopPropagation(); ce.preventDefault(); window.removeEventListener("click",killer,true); };
     window.addEventListener("click",killer,true);
+    setTimeout(()=>window.removeEventListener("click",killer,true),400); // self-clear if no click comes
   }
-  band=null;
 }
 
 function onResizeDown(e){
