@@ -477,7 +477,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.7</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.8</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -1417,12 +1417,13 @@ function clearSelection(){
 }
 function updateSelBar(){
   let bar=document.getElementById("selBar");
-  if(SELECTED.size<2){ if(bar) bar.remove(); return; }
+  if(SELECTED.size<1){ if(bar) bar.remove(); return; }
   if(!bar){
     bar=document.createElement("div"); bar.id="selBar";
     document.body.appendChild(bar);
   }
-  bar.innerHTML=`<b>${SELECTED.size}</b> selected — drag to move, or `+
+  const hint = SELECTED.size<2 ? " — Ctrl-click more, then drag to move" : " — drag any one to move them together";
+  bar.innerHTML=`<b>${SELECTED.size}</b> selected${hint} `+
     `<button onclick="openBulkCommodity()">Set commodity…</button>`+
     `<button onclick="clearSelection()">Clear</button>`;
 }
@@ -1472,83 +1473,15 @@ async function applyBulkCommodity(){
     toast(`${n} of ${items.length} didn't save — all reverted`, true);
   }
 }
-/* ---- rubber-band selection: drag a box over empty space to select blocks ---- */
-// remove ANY stray band boxes and clear hover highlights (defensive cleanup)
-function killStrayBands(){
-  document.querySelectorAll("#bandBox, .band-box").forEach(el=>el.remove());
-  document.querySelectorAll(".ev.band-hit").forEach(el=>el.classList.remove("band-hit"));
-}
-function attachBandSelect(){
-  const wrap=document.getElementById("calwrap");
-  if(!wrap || wrap._bandBound) return;
-  wrap._bandBound=true;
-  wrap.addEventListener("pointerdown", onBandDown);
-}
-function endBand(){
-  // single teardown path — always runs, however the band ends
-  window.removeEventListener("pointermove", onBandMove);
-  window.removeEventListener("pointerup", onBandUp);
-  window.removeEventListener("pointercancel", onBandUp);
-  killStrayBands();
-  band=null;
-}
-function onBandDown(e){
-  // only start a band on empty calendar space (not on a block, resize handle,
-  // or while another interaction is live)
-  if(e.button!==0) return;
-  if(e.target.closest(".ev")||e.target.closest(".resize-handle")) return;
-  if(drag||resize||PLACING||groupDrag) return;
-  const col=e.target.closest(".daycol");
-  if(!col) return;                       // only inside the day columns
-  // clear any band that didn't tear down cleanly before starting a new one
-  if(band) endBand();
-  killStrayBands();
-  band={ startX:e.clientX, startY:e.clientY, moved:false,
-         addTo:(e.ctrlKey||e.metaKey||e.shiftKey), pid:e.pointerId };
-  const boxEl=document.createElement("div");
-  boxEl.className="band-box"; boxEl.id="bandBox";
-  document.body.appendChild(boxEl);      // on body so render() can't strand it
-  band.box=boxEl;
-  try{ e.target.setPointerCapture && e.target.setPointerCapture(e.pointerId); band.capEl=e.target; }catch(_){}
-  window.addEventListener("pointermove", onBandMove);
-  window.addEventListener("pointerup", onBandUp);
-  window.addEventListener("pointercancel", onBandUp);
-}
-function onBandMove(e){
-  if(!band) return;
-  const dx=e.clientX-band.startX, dy=e.clientY-band.startY;
-  if(Math.abs(dx)>4||Math.abs(dy)>4) band.moved=true;
-  if(!band.moved){ if(band.box) band.box.style.display="none"; return; }
-  const x1=Math.min(e.clientX,band.startX), y1=Math.min(e.clientY,band.startY);
-  const x2=Math.max(e.clientX,band.startX), y2=Math.max(e.clientY,band.startY);
-  if(band.box) Object.assign(band.box.style,{display:"block",position:"fixed",
-    left:x1+"px",top:y1+"px",width:(x2-x1)+"px",height:(y2-y1)+"px"});
-  // highlight blocks that intersect the band (viewport coords on both sides)
-  document.querySelectorAll(".ev").forEach(ev=>{
-    if(ev.dataset.busy==="1") return;
-    const r=ev.getBoundingClientRect();
-    const hit=!(r.right<x1||r.left>x2||r.bottom<y1||r.top>y2);
-    ev.classList.toggle("band-hit", hit);
-  });
-}
-function onBandUp(e){
-  if(!band){ endBand(); return; }
-  const wasDrag=band.moved;
-  const capEl=band.capEl, pid=band.pid;
-  // collect hits BEFORE teardown wipes the highlight class
-  const hits=wasDrag ? [...document.querySelectorAll(".ev.band-hit")] : [];
-  const addTo=band.addTo;
-  try{ capEl && capEl.releasePointerCapture && capEl.releasePointerCapture(pid); }catch(_){}
-  endBand();                              // removes box + listeners + clears band
-  if(wasDrag){
-    if(!addTo) SELECTED.clear();
-    hits.forEach(ev=>{ ev.classList.add("selected"); SELECTED.add(ev.dataset.id); });
-    updateSelBar();
-    // suppress the click that would otherwise open a new booking
-    const killer=(ce)=>{ ce.stopPropagation(); ce.preventDefault(); window.removeEventListener("click",killer,true); };
-    window.addEventListener("click",killer,true);
-    setTimeout(()=>window.removeEventListener("click",killer,true),400); // self-clear if no click comes
-  }
+/* ---- multi-select: Ctrl/Cmd/Shift-click a block to add/remove it ---- */
+// (rubber-band removed — Ctrl-click is simpler & more reliable)
+function killStrayBands(){ /* no-op kept so render() can call it safely */ }
+function attachBandSelect(){ /* no-op: band selection removed */ }
+function toggleSelect(ev){
+  const id=ev.dataset.id; if(!id) return;
+  if(SELECTED.has(id)){ SELECTED.delete(id); ev.classList.remove("selected"); }
+  else { SELECTED.add(id); ev.classList.add("selected"); }
+  updateSelBar();
 }
 
 function onResizeDown(e){
@@ -1592,8 +1525,18 @@ async function onResizeUp(e){
 function onDown(e){
   const ev=e.currentTarget;
   const id=ev.dataset.id;
+  // Ctrl / Cmd / Shift-click → toggle this block in the multi-selection
+  // (no drag, no editor — just add/remove it).
+  if(e.ctrlKey||e.metaKey||e.shiftKey){
+    e.preventDefault(); e.stopPropagation();
+    toggleSelect(ev);
+    const killer=(ce)=>{ ce.stopPropagation(); ce.preventDefault(); window.removeEventListener("click",killer,true); };
+    window.addEventListener("click",killer,true);
+    setTimeout(()=>window.removeEventListener("click",killer,true),400);
+    return;
+  }
   // If this block is part of a multi-selection, drag the whole GROUP together.
-  if(SELECTED.size>=2 && SELECTED.has(id)){
+  if(SELECTED.size>=1 && SELECTED.has(id)){
     return groupDown(e, ev);
   }
   // A plain click/drag on an unselected block clears any selection first.
