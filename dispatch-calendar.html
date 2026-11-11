@@ -467,7 +467,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.4</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.5</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -964,6 +964,7 @@ function normalise(r, sheet){
   return {
     id:r.id, sheetKey:key, sheetName:sheetMeta(key).name, url:sheet.url,
     site:r.site||"", commodity:r.commodity||"", release:r.release||"",
+    contact:r.contact||"", phone:r.phone||"", maps:r.maps||"",   // grower contact details
     status:r.status||"", driver:r.driver||"", note:r.note||"", notes:r.notes||"", tag:r.tag||"",
     grid:grid,                                    // blank/anything else → Grid 1
     grade:r.grade||"",
