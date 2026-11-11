@@ -19,7 +19,7 @@
     --now-line:#e04a3a;
     --accent:#b8860b;
     --lane-divider:#c9c9d0;
-    --day-divider:#9aa0ae;   /* strong line between days */
+    --day-divider:#6b7280;   /* bold line between days (both-grids view) */
     --grid2-tint:rgba(70,110,160,.055);  /* faint wash on Grid 2 half */
     --offhour:#f4f4f6;
 
@@ -116,9 +116,9 @@
     position:sticky;top:0;z-index:30;background:var(--header-bg);
     border-bottom:1px solid var(--grid-line-strong);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:7px 4px 6px;border-left:2px solid var(--day-divider);
+    padding:7px 4px 6px;border-left:3px solid var(--day-divider);
   }
-  .dayhead:last-of-type{border-right:2px solid var(--day-divider)}
+  .dayhead:last-of-type{border-right:3px solid var(--day-divider)}
   /* day zebra removed — days separated by divider lines only, so the Grid 2
      tint inside each day isn't competing with a per-day shade */
   .dayhead.dayalt{background:var(--header-bg)}
@@ -151,8 +151,8 @@
   /* day column body */
   /* each day column gets a STRONG left edge = the day boundary; the lighter
      grid1/grid2 split inside a day is drawn by .lane.l2 */
-  .daycol{position:relative;border-left:2px solid var(--day-divider);background:var(--bg)}
-  .daycol:last-child{border-right:2px solid var(--day-divider)}
+  .daycol{position:relative;border-left:3px solid var(--day-divider);background:var(--bg)}
+  .daycol:last-child{border-right:3px solid var(--day-divider)}
   .daycol.dayalt{background:var(--bg)}   /* zebra removed; days use divider lines */
   .daycol.today{background:#fffdf7}
   .daycol.weekend{background:#fafafb}
@@ -372,6 +372,20 @@
   .service input.time-in{width:92px}
   .service select.dur-sel{width:92px}
   .service .rm{position:absolute;top:8px;right:9px;border:none;background:none;color:var(--ink-faint);font-size:16px;cursor:pointer;line-height:1}
+  /* access gate overlay */
+  #accessGate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#1f2937,#374151);padding:20px}
+  .gate-card{background:#fff;border-radius:16px;padding:32px 28px;width:100%;max-width:340px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);text-align:center;font-family:"Inter",system-ui,sans-serif}
+  .gate-logo{font-size:20px;font-weight:800;color:#1f2937;letter-spacing:-.02em}
+  .gate-sub{font-size:13px;color:#6b7280;margin:6px 0 20px}
+  .gate-card input{width:100%;box-sizing:border-box;padding:12px 14px;font-size:15px;
+    border:1px solid #d1d5db;border-radius:10px;outline:none;margin-bottom:12px}
+  .gate-card input:focus{border-color:#2563c9;box-shadow:0 0 0 3px rgba(37,99,201,.15)}
+  .gate-card button{width:100%;padding:12px;font-size:15px;font-weight:700;color:#fff;
+    background:#2563c9;border:none;border-radius:10px;cursor:pointer}
+  .gate-card button:hover{background:#1d4ed8}
+  .gate-err{color:#dc2626;font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}
   .swatch-dot{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.15);flex-shrink:0}
   /* clickable swatch (opens the colour picker) — a touch bigger so it's tappable */
   .swatch-btn{width:16px;height:16px;border-radius:4px;padding:0;cursor:pointer;
@@ -439,7 +453,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.2</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.3</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -2428,9 +2442,52 @@ function DEMO_JOBS(){
   ];
 }
 
+/* ---------- simple access gate (keeps the casual/public out) ----------
+   NOTE: this is a shared-password speed bump, NOT real security — the page
+   source is readable by anyone who opens dev tools. It stops someone who just
+   has the link. Once entered, the device stays unlocked until its cache clears. */
+const ACCESS_PASSWORD = "DGgrainboard";           // <-- the shared password
+const ACCESS_KEY = "grainboard_unlocked_v1";
+function isUnlocked(){
+  try{ return localStorage.getItem(ACCESS_KEY)==="1"; }catch(e){ return false; }
+}
+function unlock(){ try{ localStorage.setItem(ACCESS_KEY,"1"); }catch(e){} }
+function showGate(){
+  const g=document.createElement("div");
+  g.id="accessGate";
+  g.innerHTML=`
+    <div class="gate-card">
+      <div class="gate-logo">Demeter Grainboard</div>
+      <div class="gate-sub">Enter the team password to continue</div>
+      <input id="gatePw" type="password" autocomplete="off" placeholder="Password"
+             onkeydown="if(event.key==='Enter')tryUnlock()">
+      <button onclick="tryUnlock()">Enter</button>
+      <div id="gateErr" class="gate-err"></div>
+    </div>`;
+  document.body.appendChild(g);
+  setTimeout(()=>{ const i=document.getElementById("gatePw"); if(i) i.focus(); },50);
+}
+function tryUnlock(){
+  const i=document.getElementById("gatePw");
+  const err=document.getElementById("gateErr");
+  if(i && i.value===ACCESS_PASSWORD){
+    unlock();
+    const g=document.getElementById("accessGate"); if(g) g.remove();
+    bootBoard();
+  }else{
+    if(err) err.textContent="Incorrect password";
+    if(i){ i.value=""; i.focus(); }
+  }
+}
+
 /* ---------- init + auto-refresh ---------- */
-loadCustomColors();   // staff-chosen commodity colours (per browser)
-loadAll();
+function bootBoard(){
+  loadCustomColors();   // staff-chosen commodity colours (per browser)
+  loadAll();
+  setInterval(autoRefresh, 20000);
+  setTimeout(()=>{ const w=document.getElementById("calwrap"); if(w) w.scrollTop=(6-DAY_START)*HOUR_PX-10; },120);
+}
+if(isUnlocked()){ bootBoard(); } else { showGate(); }
 // auto-refresh every 20s for multi-screen use, but NEVER while someone is
 // editing (popup open), dragging, or placing a duplicate/move — so a refresh
 // can't yank the UI out from under them.
@@ -2440,13 +2497,9 @@ function autoRefresh(){
     || document.getElementById("editBackdrop").style.display==="flex";
   if(!busy) loadAll();
 }
-setInterval(autoRefresh, 20000); // re-sync every 20s
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)autoRefresh();});
-
-/* scroll to ~6am on first paint */
-window.addEventListener("load",()=>{
-  setTimeout(()=>{ document.getElementById("calwrap").scrollTop=(6-DAY_START)*HOUR_PX-10; },100);
-});
+// NOTE: the 20s auto-refresh interval and first-paint scroll are started inside
+// bootBoard() (after the access gate is passed), so they don't run on the gate.
+document.addEventListener("visibilitychange",()=>{if(!document.hidden && isUnlocked())autoRefresh();});
 </script>
 </body>
 </html>
