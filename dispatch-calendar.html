@@ -19,7 +19,7 @@
     --now-line:#e04a3a;
     --accent:#b8860b;
     --lane-divider:#c9c9d0;
-    --day-divider:#6b7280;   /* bold line between days (both-grids view) */
+    --day-divider:#a8adb8;   /* line between days — light, 1px */
     --grid2-tint:rgba(70,110,160,.055);  /* faint wash on Grid 2 half */
     --offhour:#f4f4f6;
 
@@ -116,9 +116,9 @@
     position:sticky;top:0;z-index:30;background:var(--header-bg);
     border-bottom:1px solid var(--grid-line-strong);
     display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:7px 4px 6px;border-left:3px solid var(--day-divider);
+    padding:7px 4px 6px;border-left:1px solid var(--day-divider);
   }
-  .dayhead:last-of-type{border-right:3px solid var(--day-divider)}
+  .dayhead:last-of-type{border-right:1px solid var(--day-divider)}
   /* day zebra removed — days separated by divider lines only, so the Grid 2
      tint inside each day isn't competing with a per-day shade */
   .dayhead.dayalt{background:var(--header-bg)}
@@ -151,8 +151,8 @@
   /* day column body */
   /* each day column gets a STRONG left edge = the day boundary; the lighter
      grid1/grid2 split inside a day is drawn by .lane.l2 */
-  .daycol{position:relative;border-left:3px solid var(--day-divider);background:var(--bg)}
-  .daycol:last-child{border-right:3px solid var(--day-divider)}
+  .daycol{position:relative;border-left:1px solid var(--day-divider);background:var(--bg)}
+  .daycol:last-child{border-right:1px solid var(--day-divider)}
   .daycol.dayalt{background:var(--bg)}   /* zebra removed; days use divider lines */
   .daycol.today{background:#fffdf7}
   .daycol.weekend{background:#fafafb}
