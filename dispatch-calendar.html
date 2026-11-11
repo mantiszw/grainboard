@@ -167,6 +167,9 @@
   .lane-wm{position:absolute;top:8px;left:50%;transform:translateX(-50%);
     font-size:40px;font-weight:800;color:rgba(90,110,140,.07);line-height:1;user-select:none}
   .hourline{position:absolute;left:0;right:0;border-top:1px solid var(--grid-line-strong)}
+  /* faint per-column hour label (Timely-style) — sits behind the blocks */
+  .colhour{position:absolute;left:4px;z-index:0;font-size:8px;font-weight:600;
+    color:var(--ink-faint,#b4b8c2);pointer-events:none;letter-spacing:-.02em}
   .quarterline{position:absolute;left:0;right:0;border-top:1px solid #f1f1f4}
   .halfline{position:absolute;left:0;right:0;border-top:1px dashed #e4e4e9}
   .offhour{position:absolute;left:0;right:0;background:var(--offhour);
@@ -212,20 +215,17 @@
   .ev.clash .ev-tag{font-size:8px;margin-left:3px;padding:0 3px}
   .ev .sub{font-weight:500;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
   .ev .tm{font-weight:500;opacity:.7;font-size:9.5px;white-space:nowrap}
-  /* clash (narrow) blocks: tiny text + wrap so the whole name shows
-     — "Millstone Ops"/"Schilling Holdings" instead of just "M…"/"S…" */
-  .ev.clash{padding:3px 4px}
-  .ev.clash .title{font-size:9px;line-height:1.05;padding-right:0;letter-spacing:-.02em;
-    white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-    text-overflow:clip;margin-top:9px}
-  .ev.clash .sub{font-size:8px;white-space:normal;line-height:1.05}
-  .ev.clash .tm{font-size:7.5px}
-  .ev.clash .ev-trans{font-size:5px;padding:1px 2px;max-width:none;letter-spacing:0}
-  /* when a clash block is peeked/hovered to full width, restore normal sizing */
-  .ev.clash:hover .title, .ev.clash.peek .title{font-size:inherit;padding-right:46px;
-    white-space:nowrap;-webkit-line-clamp:unset;margin-top:0;display:block;text-overflow:ellipsis}
-  .ev.clash:hover .sub, .ev.clash.peek .sub{font-size:9.5px;white-space:nowrap}
-  .ev.clash:hover .ev-trans, .ev.clash.peek .ev-trans{font-size:6.5px;padding:1px 4px}
+  /* clash (narrow, side-by-side) blocks: keep the SAME normal font size as any
+     other block (like Timely). The name just wraps to 2 lines instead of
+     shrinking, so "Schilling Holdings" shows in full rather than "S…". */
+  .ev.clash{padding:2px 5px}
+  .ev.clash .title{padding-right:0;white-space:normal;overflow:hidden;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;text-overflow:clip}
+  .ev.clash .sub{white-space:normal}
+  /* when a clash block is peeked/hovered to full width, restore single-line */
+  .ev.clash:hover .title, .ev.clash.peek .title{padding-right:46px;
+    white-space:nowrap;-webkit-line-clamp:unset;display:block;text-overflow:ellipsis}
+  .ev.clash:hover .sub, .ev.clash.peek .sub{white-space:nowrap}
   /* transporter ribbon — top-right corner, colour-coded per transporter */
   .ev-trans{
     position:absolute;top:0;right:0;z-index:3;
@@ -1068,6 +1068,12 @@ function render(){
     for(let h=DAY_START;h<=DAY_END;h++){
       const top=(h-DAY_START)*HOUR_PX;
       html+=`<div class="hourline" style="top:${top}px"></div>`;
+      // faint hour label inside each day column (like Timely) so times read
+      // next to the loads on every day, not just the far-left gutter
+      if(h<DAY_END){
+        const hl=(h%12)||12, ap=h<12?"am":"pm";
+        html+=`<div class="colhour" style="top:${top+2}px">${hl}${ap}</div>`;
+      }
       if(h<DAY_END){
         // 15, 30, 45 min lines — :30 slightly stronger
         html+=`<div class="quarterline" style="top:${top+HOUR_PX*0.25}px"></div>`;
