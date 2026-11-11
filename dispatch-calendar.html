@@ -386,6 +386,20 @@
     background:#2563c9;border:none;border-radius:10px;cursor:pointer}
   .gate-card button:hover{background:#1d4ed8}
   .gate-err{color:#dc2626;font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}
+  /* multi-select: rubber-band box, highlighted & selected blocks, toolbar */
+  #bandBox{position:fixed;z-index:8000;border:1.5px solid #2563c9;
+    background:rgba(37,99,201,.12);border-radius:4px;pointer-events:none}
+  .ev.band-hit{outline:2px solid #2563c9;outline-offset:-1px}
+  .ev.selected{outline:2.5px solid #2563c9;outline-offset:-1px;
+    box-shadow:0 0 0 2px rgba(37,99,201,.25)}
+  #selBar{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:8500;
+    background:#1f2937;color:#fff;padding:9px 14px;border-radius:999px;font-size:13px;
+    box-shadow:0 8px 24px rgba(0,0,0,.3);display:flex;align-items:center;gap:10px;
+    font-family:"Inter",system-ui,sans-serif}
+  #selBar b{font-weight:800}
+  #selBar button{background:#374151;color:#fff;border:none;border-radius:999px;
+    padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  #selBar button:hover{background:#4b5563}
   .swatch-dot{width:12px;height:12px;border-radius:3px;border:1px solid rgba(0,0,0,.15);flex-shrink:0}
   /* clickable swatch (opens the colour picker) — a touch bigger so it's tappable */
   .swatch-btn{width:16px;height:16px;border-radius:4px;padding:0;cursor:pointer;
@@ -453,7 +467,7 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.3</span></div>
+    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.4</span></div>
     <div class="nav">
       <button class="navbtn" id="prev" title="Previous">‹</button>
       <button class="today-btn" id="today">Today</button>
@@ -1087,6 +1101,7 @@ function attachEmptyClick(){
   document.querySelectorAll(".daycol").forEach(col=>{
     col.addEventListener("click",(e)=>{
       if(e.target.closest(".ev")) return;        // ignore clicks on events
+      if(SELECTED.size){ clearSelection(); return; }  // empty-space click clears a selection
       document.querySelectorAll(".ev.peek").forEach(el=>el.classList.remove("peek")); // collapse any peeked clash
       const rect=col.getBoundingClientRect();
       const yInside=e.clientY-rect.top;
@@ -1369,14 +1384,100 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",
 
 /* ---------- drag to reschedule ---------- */
 let drag=null, resize=null;
+let SELECTED=new Set();     // ids of multi-selected bookings
+let band=null;              // rubber-band selection drag state
+let groupDrag=null;         // moving several selected blocks together
 function attachDrag(){
   document.querySelectorAll(".ev").forEach(ev=>{
     ev.addEventListener("pointerdown", onDown);
+    if(SELECTED.has(ev.dataset.id)) ev.classList.add("selected");
   });
   document.querySelectorAll(".resize-handle").forEach(h=>{
     h.addEventListener("pointerdown", onResizeDown);
   });
+  attachBandSelect();
 }
+/* clear the current multi-selection */
+function clearSelection(){
+  SELECTED.clear();
+  document.querySelectorAll(".ev.selected").forEach(el=>el.classList.remove("selected"));
+  updateSelBar();
+}
+function updateSelBar(){
+  let bar=document.getElementById("selBar");
+  if(SELECTED.size<2){ if(bar) bar.remove(); return; }
+  if(!bar){
+    bar=document.createElement("div"); bar.id="selBar";
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML=`<b>${SELECTED.size}</b> selected — drag any one to move them together `+
+    `<button onclick="clearSelection()">Clear</button>`;
+}
+/* ---- rubber-band selection: drag a box over empty space to select blocks ---- */
+function attachBandSelect(){
+  const wrap=document.getElementById("calwrap");
+  if(!wrap || wrap._bandBound) return;
+  wrap._bandBound=true;
+  wrap.addEventListener("pointerdown", onBandDown);
+}
+function onBandDown(e){
+  // only start a band on empty calendar space (not on a block, resize handle,
+  // or while another interaction is live)
+  if(e.button!==0) return;
+  if(e.target.closest(".ev")||e.target.closest(".resize-handle")) return;
+  if(drag||resize||PLACING||groupDrag) return;
+  const col=e.target.closest(".daycol");
+  if(!col) return;                       // only inside the day columns
+  const wrap=document.getElementById("calwrap");
+  const wr=wrap.getBoundingClientRect();
+  band={ startX:e.clientX, startY:e.clientY, moved:false,
+         addTo:(e.ctrlKey||e.metaKey||e.shiftKey) };
+  const boxEl=document.createElement("div");
+  boxEl.id="bandBox"; wrap.appendChild(boxEl);
+  band.box=boxEl; band.wrapRect=wr; band.wrap=wrap;
+  window.addEventListener("pointermove", onBandMove);
+  window.addEventListener("pointerup", onBandUp);
+}
+function onBandMove(e){
+  if(!band) return;
+  const dx=e.clientX-band.startX, dy=e.clientY-band.startY;
+  if(Math.abs(dx)>4||Math.abs(dy)>4) band.moved=true;
+  if(!band.moved) return;
+  // position the band box (in page coords, fixed)
+  const x1=Math.min(e.clientX,band.startX), y1=Math.min(e.clientY,band.startY);
+  const x2=Math.max(e.clientX,band.startX), y2=Math.max(e.clientY,band.startY);
+  Object.assign(band.box.style,{position:"fixed",left:x1+"px",top:y1+"px",
+    width:(x2-x1)+"px",height:(y2-y1)+"px"});
+  // highlight blocks that intersect the band
+  document.querySelectorAll(".ev").forEach(ev=>{
+    if(ev.dataset.busy==="1") return;    // skip busy bands
+    const r=ev.getBoundingClientRect();
+    const hit=!(r.right<x1||r.left>x2||r.bottom<y1||r.top>y2);
+    ev.classList.toggle("band-hit", hit);
+  });
+}
+function onBandUp(e){
+  window.removeEventListener("pointermove", onBandMove);
+  window.removeEventListener("pointerup", onBandUp);
+  if(!band){ return; }
+  const wasDrag=band.moved;
+  if(band.box) band.box.remove();
+  if(wasDrag){
+    if(!band.addTo) SELECTED.clear();
+    document.querySelectorAll(".ev.band-hit").forEach(ev=>{
+      ev.classList.remove("band-hit");
+      ev.classList.add("selected");
+      SELECTED.add(ev.dataset.id);
+    });
+    updateSelBar();
+    // suppress the click that would otherwise open a new booking
+    band._suppressClick=true;
+    const killer=(ev)=>{ ev.stopPropagation(); ev.preventDefault(); window.removeEventListener("click",killer,true); };
+    window.addEventListener("click",killer,true);
+  }
+  band=null;
+}
+
 function onResizeDown(e){
   e.stopPropagation();           // don't start a move-drag
   const ev=e.target.closest(".ev");
@@ -1417,8 +1518,14 @@ async function onResizeUp(e){
 }
 function onDown(e){
   const ev=e.currentTarget;
-  ev.setPointerCapture(e.pointerId);
   const id=ev.dataset.id;
+  // If this block is part of a multi-selection, drag the whole GROUP together.
+  if(SELECTED.size>=2 && SELECTED.has(id)){
+    return groupDown(e, ev);
+  }
+  // A plain click/drag on an unselected block clears any selection first.
+  if(SELECTED.size){ clearSelection(); }
+  ev.setPointerCapture(e.pointerId);
   const job=STATE.jobs.find(j=>j.id===id);
   // grab offset = where inside the block the pointer landed, so the block
   // doesn't jump to put its top under the cursor
@@ -1431,6 +1538,85 @@ function onDown(e){
   ev.classList.remove("settling");
   window.addEventListener("pointermove", onMove);
   window.addEventListener("pointerup", onUp);
+}
+
+/* ---- group move: drag the whole selection by one day/time offset ---- */
+function groupDown(e, ev){
+  const items=[...SELECTED].map(id=>{
+    const el=document.querySelector(`.ev[data-id="${id}"]`);
+    const job=STATE.jobs.find(j=>j.id===id);
+    return (el&&job)?{el,job,origTop:parseFloat(el.style.top)}:null;
+  }).filter(Boolean);
+  if(!items.length) return;
+  groupDrag={ startX:e.clientX, startY:e.clientY, moved:false, items,
+              anchorJob: items.find(i=>i.job.id===ev.dataset.id).job };
+  items.forEach(i=>i.el.classList.add("dragging"));
+  window.addEventListener("pointermove", onGroupMove);
+  window.addEventListener("pointerup", onGroupUp);
+}
+function onGroupMove(e){
+  if(!groupDrag) return;
+  const dx=e.clientX-groupDrag.startX, dy=e.clientY-groupDrag.startY;
+  if(Math.abs(dx)>3||Math.abs(dy)>3) groupDrag.moved=true;
+  if(!groupDrag.moved) return;
+  // every selected block follows the pointer by the same visual delta
+  groupDrag.items.forEach(i=>{ i.el.style.transform=`translate(${dx}px, ${dy}px)`; });
+  // which day column is under the cursor → target for the ANCHOR block
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const col=(el&&el.closest)?el.closest(".daycol"):null;
+  document.querySelectorAll(".daycol.drop-ok").forEach(c=>c.classList.remove("drop-ok"));
+  if(col) col.classList.add("drop-ok");
+  groupDrag.lastCol=col;
+  groupDrag.lastDX=dx; groupDrag.lastDY=dy;
+}
+async function onGroupUp(e){
+  window.removeEventListener("pointermove", onGroupMove);
+  window.removeEventListener("pointerup", onGroupUp);
+  if(!groupDrag){ return; }
+  const g=groupDrag; groupDrag=null;
+  document.querySelectorAll(".daycol.drop-ok").forEach(c=>c.classList.remove("drop-ok"));
+  g.items.forEach(i=>{ i.el.classList.remove("dragging"); i.el.style.transform=""; });
+
+  if(!g.moved){ // a plain click on a selected block → just open it
+    const j=g.anchorJob; if(j){ if(j.isBusy) openBusy(j); else openEditor(j); }
+    return;
+  }
+
+  // work out the offset from the ANCHOR block's old slot to where it was dropped
+  const col=g.lastCol;
+  if(!col){ render(); return; }
+  const newDayKey=+col.dataset.daykey;
+  const anchorOldDayKey=dayKey(g.anchorJob.tipDate);
+  const dayDelta=daysBetweenKeys(anchorOldDayKey, newDayKey);
+  // time delta from the vertical drag (snapped to slots)
+  const minDelta=Math.round((g.lastDY/HOUR_PX*60)/SLOT_MIN)*SLOT_MIN;
+
+  if(dayDelta===0 && minDelta===0){ render(); return; }
+
+  // apply the SAME offset to every selected block, clamped to day bounds
+  const prev=g.items.map(i=>({job:i.job, tipDate:i.job.tipDate, tipMin:i.job.tipMin}));
+  g.items.forEach(({job})=>{
+    const dur=job.duration||DEFAULT_DUR;
+    const nd=addDays(job.tipDate, dayDelta);
+    let nm=job.tipMin+minDelta;
+    nm=Math.max(DAY_START*60, Math.min(DAY_END*60-dur, nm));
+    job.tipDate=nd; job.tipMin=nm;
+  });
+  render();
+  toast(`Moving ${g.items.length} bookings…`);
+
+  // write each one back (parallel); revert ALL if any fails
+  const writes=g.items.map(({job})=>writeBack(job,{ id:job.id, grid:String(job.grid||1),
+    tipDate:isoDate(job.tipDate), tipTime:minToSheetTime(job.tipMin) }));
+  const results=await Promise.all(writes);
+  if(results.every(Boolean)){
+    toast(`Moved ${g.items.length} bookings`);
+  }else{
+    prev.forEach(p=>{ p.job.tipDate=p.tipDate; p.job.tipMin=p.tipMin; });
+    render();
+    const n=results.filter(x=>!x).length;
+    toast(`${n} of ${g.items.length} didn't save — all reverted`, true);
+  }
 }
 function onMove(e){
   if(!drag) return;
@@ -1526,6 +1712,7 @@ async function onUp(e){
   drag=null;
 }
 function dateFromKey(k){ const y=Math.floor(k/10000),m=Math.floor((k%10000)/100),d=k%100; return new Date(y,m,d); }
+function daysBetweenKeys(a,b){ return Math.round((dateFromKey(b)-dateFromKey(a))/86400000); }
 function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
 let PENDING_WRITES=0;   // in-flight sheet writes; auto-refresh waits for these
