@@ -399,6 +399,13 @@
   .cal.both-grids .ev .tm{font-size:8px}
   .cal.both-grids .ev.snug .title{font-size:9.5px}
   .cal.both-grids .ev.snug .sub{font-size:8px}
+  /* transporter ribbon: full name by default; single letter in both-grids view */
+  .ev-trans .trans-mini{display:none}
+  .cal.both-grids .ev-trans .trans-full{display:none}
+  .cal.both-grids .ev-trans .trans-mini{display:inline}
+  .cal.both-grids .ev-trans{padding:1px 4px}
+  /* with the ribbon now tiny, the name can run almost to the edge */
+  .cal.both-grids .ev .title{padding-right:20px}
   /* multi-select: rubber-band box, highlighted & selected blocks, toolbar */
   #bandBox, .band-box{position:fixed;z-index:8000;border:1.5px solid #2563c9;
     background:rgba(37,99,201,.12);border-radius:4px;pointer-events:none}
@@ -492,7 +499,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.6</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.7</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1408,10 +1415,14 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const width = colW - rightGap;
   const z = 2 + col;
   const meta = sheetMeta(j.sheetKey);
-  // no ribbon for Growers own (OWN) — it's the default, so a tag is just noise
+  // no ribbon for Growers own (OWN) — it's the default, so a tag is just noise.
+  // In both-grids view the columns are narrow, so the ribbon shows just the
+  // first letter (M for Marleys) to leave more room for the farm name.
+  const transMini = (meta.short||"?").trim().charAt(0).toUpperCase();
   const transBadge = (j.sheetKey==="OWN")
     ? ""
-    : `<span class="ev-trans" style="background:${meta.color}" title="${esc(meta.name)}">${esc(meta.short)}</span>`;
+    : `<span class="ev-trans" style="background:${meta.color}" title="${esc(meta.name)}">`+
+      `<span class="trans-full">${esc(meta.short)}</span><span class="trans-mini">${esc(transMini)}</span></span>`;
   const driverBadge = driver ? `<span class="ev-driver">${esc(driver)}</span>` : "";
   // The envelope on the board now reflects OUR team note (the "Notes" column),
   // NOT the "Note" column Marleys use for their own load confirmations.
