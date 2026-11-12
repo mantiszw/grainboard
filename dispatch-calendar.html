@@ -515,7 +515,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.8</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.9</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -892,11 +892,27 @@ function renderTicker(){
   }
   bar.style.display="flex";
   if(btn) btn.classList.add("active");
-  // duplicate the message (with a gap) so the scroll loops seamlessly
   const sep="    •    ";
-  track.textContent=(txt+sep).repeat(2);
-  // speed: ~ longer message scrolls proportionally longer (min 12s)
-  const secs=Math.max(12, Math.round(txt.length/4));
+  const unit=txt+sep;
+  // Build enough repeats that ONE scroll-unit (half the track) is at least as
+  // wide as the bar — so the message is always edge-to-edge with no empty gap.
+  // The animation shifts by -50%, so we make the first half ≥ bar width.
+  track.style.animation="none";
+  track.textContent=unit;                 // measure one unit
+  const viewW=(document.querySelector(".ticker-view")||{}).clientWidth||800;
+  // rough width per unit from the measured single unit
+  const unitW=track.scrollWidth||viewW;
+  const copiesPerHalf=Math.max(1, Math.ceil(viewW/unitW)+1);
+  const half=unit.repeat(copiesPerHalf);
+  track.textContent=half+half;            // two identical halves → seamless loop
+  // speed: constant pixels/sec so long and short messages scroll at a steady pace
+  const halfW=track.scrollWidth/2;
+  const pxPerSec=90;                       // scroll speed
+  const secs=Math.max(8, Math.round(halfW/pxPerSec));
+  // restart the animation cleanly, THEN set its duration (order matters:
+  // clearing `animation` also clears duration, so duration goes last)
+  void track.offsetWidth;                  // reflow
+  track.style.animation="ticker-scroll linear infinite";
   track.style.animationDuration=secs+"s";
 }
 function editAnnounce(){
