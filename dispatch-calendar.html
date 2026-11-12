@@ -392,6 +392,13 @@
     background:#2563c9;border:none;border-radius:10px;cursor:pointer}
   .gate-card button:hover{background:#1d4ed8}
   .gate-err{color:#dc2626;font-size:12.5px;font-weight:600;margin-top:10px;min-height:16px}
+  /* Both-grids view = narrow columns → scale block text down a notch so more
+     of the name fits. Single-grid view keeps the full-size text. */
+  .cal.both-grids .ev .title{font-size:10px}
+  .cal.both-grids .ev .sub{font-size:8.5px}
+  .cal.both-grids .ev .tm{font-size:8px}
+  .cal.both-grids .ev.snug .title{font-size:9.5px}
+  .cal.both-grids .ev.snug .sub{font-size:8px}
   /* multi-select: rubber-band box, highlighted & selected blocks, toolbar */
   #bandBox, .band-box{position:fixed;z-index:8000;border:1.5px solid #2563c9;
     background:rgba(37,99,201,.12);border-radius:4px;pointer-events:none}
@@ -1154,6 +1161,8 @@ function render(){
   });
 
   cal.innerHTML=html;
+  // smaller block text ONLY in both-grids view (narrow columns); full size on single grid
+  cal.classList.toggle("both-grids", STATE.gridFilter===0);
   attachDrag();
   attachEmptyClick();
 }
