@@ -174,6 +174,8 @@
   /* faint per-column hour label (Timely-style) — sits behind the blocks */
   .colhour{position:absolute;left:4px;z-index:0;font-size:8px;font-weight:600;
     color:var(--ink-faint,#b4b8c2);pointer-events:none;letter-spacing:-.02em}
+  /* second label at the start of the Grid 2 half when both grids show */
+  .colhour-g2{left:calc(50% + 4px)}
   .quarterline{position:absolute;left:0;right:0;border-top:1px solid #f1f1f4}
   .halfline{position:absolute;left:0;right:0;border-top:1px dashed #e4e4e9}
   .offhour{position:absolute;left:0;right:0;background:var(--offhour);
@@ -483,7 +485,7 @@
   <div class="topbar">
     <!-- LEFT: brand + grid buttons -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.0</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.1</span></div>
       <div class="gridtoggle">
         <button id="gridAll" class="on">Both grids</button>
         <button id="grid1">Grid 1</button>
@@ -1085,6 +1087,10 @@ function render(){
       if(h<DAY_END){
         const hl=(h%12)||12, ap=h<12?"am":"pm";
         html+=`<div class="colhour" style="top:${top+2}px">${hl}${ap}</div>`;
+        // when BOTH grids show, repeat the label at the start of the Grid 2 half
+        if(STATE.gridFilter===0){
+          html+=`<div class="colhour colhour-g2" style="top:${top+2}px">${hl}${ap}</div>`;
+        }
       }
       if(h<DAY_END){
         // 15, 30, 45 min lines — :30 slightly stronger
