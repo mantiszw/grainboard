@@ -483,11 +483,14 @@
 </head>
 <body>
   <div class="topbar">
-    <!-- LEFT: brand + commodity filter -->
+    <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.3</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.4</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
+      </select>
+      <select class="filter-sel" id="transporterFilter">
+        <option value="__ALL__">All transporters</option>
       </select>
     </div>
 
@@ -513,9 +516,6 @@
         <button id="grid2">Grid 2</button>
       </div>
       <label class="cxlbl"><input type="checkbox" id="hideCancelled"> Hide cancelled</label>
-      <select class="filter-sel" id="transporterFilter">
-        <option value="__ALL__">All transporters</option>
-      </select>
       <button class="refresh-btn" id="refreshBtn" title="Refresh now">⟳</button>
       <span class="synced"><span class="status-dot" id="statusDot"></span><span id="syncedText">Loading…</span></span>
     </div>
