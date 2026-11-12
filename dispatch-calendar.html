@@ -62,6 +62,22 @@
   }
   /* left zone: brand + grid buttons */
   .left-zone{display:flex;align-items:center;gap:12px}
+  /* announcement button */
+  .announce-btn{font-size:12px;font-weight:600;color:var(--ink-dim);background:#fff;
+    border:1px solid var(--grid-line-strong);border-radius:8px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+  .announce-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .announce-btn.active{background:#fff7ed;border-color:#fed7aa;color:#9a3412}
+  /* scrolling announcement ticker */
+  .ticker{flex-shrink:0;display:flex;align-items:center;gap:10px;
+    background:#1f2937;color:#fff;padding:7px 14px;overflow:hidden;cursor:pointer;
+    border-bottom:1px solid rgba(0,0,0,.2)}
+  .ticker-tag{flex:none;font-size:14px}
+  .ticker-view{flex:1;overflow:hidden;position:relative;height:18px}
+  .ticker-track{position:absolute;white-space:nowrap;will-change:transform;
+    font-size:13px;font-weight:600;letter-spacing:.01em;line-height:18px;
+    animation:ticker-scroll linear infinite}
+  .ticker:hover .ticker-track{animation-play-state:paused}
+  @keyframes ticker-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
   /* centre zone: date nav + Today + Week/Day, horizontally centred */
   .centre-nav{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0}
   .brand{font-size:15px;font-weight:800;letter-spacing:-0.01em;color:var(--ink);white-space:nowrap}
@@ -499,7 +515,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.7</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.8</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -530,9 +546,16 @@
         <button id="grid2">Grid 2</button>
       </div>
       <label class="cxlbl"><input type="checkbox" id="hideCancelled"> Hide cancelled</label>
+      <button class="announce-btn" id="announceBtn" title="Set a scrolling announcement for everyone">📢 Announcement</button>
       <button class="refresh-btn" id="refreshBtn" title="Refresh now">⟳</button>
       <span class="synced"><span class="status-dot" id="statusDot"></span><span id="syncedText">Loading…</span></span>
     </div>
+  </div>
+
+  <!-- scrolling announcement ticker (hidden when empty) -->
+  <div class="ticker" id="ticker" style="display:none" title="Click to edit the announcement">
+    <span class="ticker-tag">📢</span>
+    <div class="ticker-view"><div class="ticker-track" id="tickerTrack"></div></div>
   </div>
 
   <div class="calwrap" id="calwrap">
@@ -844,6 +867,51 @@ function driversFor(sheetKey){
   return (STATE.drivers && STATE.drivers[sheetKey]) ? STATE.drivers[sheetKey] : [];
 }
 
+/* ---- scrolling announcement ticker (shared via the Other sheet) ---- */
+const ANNOUNCE_URL = OTHER_URL;
+let ANNOUNCE_TEXT = "";
+async function loadAnnounce(){
+  if(!ANNOUNCE_URL || ANNOUNCE_URL.startsWith("PASTE_")) return;
+  try{
+    const res=await fetch(ANNOUNCE_URL+"?announce=1&_cb="+Date.now(), {redirect:"follow"});
+    const data=await res.json();
+    if(data.ok){ ANNOUNCE_TEXT=(data.announce||""); renderTicker(); }
+  }catch(e){ console.warn("[dispatch] announce load fail:", e); }
+}
+function renderTicker(){
+  const bar=document.getElementById("ticker");
+  const track=document.getElementById("tickerTrack");
+  const btn=document.getElementById("announceBtn");
+  const txt=(ANNOUNCE_TEXT||"").trim();
+  if(!bar||!track) return;
+  if(!txt){
+    bar.style.display="none";
+    track.textContent="";
+    if(btn) btn.classList.remove("active");
+    return;
+  }
+  bar.style.display="flex";
+  if(btn) btn.classList.add("active");
+  // duplicate the message (with a gap) so the scroll loops seamlessly
+  const sep="    •    ";
+  track.textContent=(txt+sep).repeat(2);
+  // speed: ~ longer message scrolls proportionally longer (min 12s)
+  const secs=Math.max(12, Math.round(txt.length/4));
+  track.style.animationDuration=secs+"s";
+}
+function editAnnounce(){
+  const cur=ANNOUNCE_TEXT||"";
+  const next=prompt("Scrolling announcement for everyone\n\n(Leave blank and OK to clear it.)", cur);
+  if(next===null) return;                 // cancelled
+  const txt=next.trim();
+  ANNOUNCE_TEXT=txt; renderTicker();       // show locally at once
+  if(!ANNOUNCE_URL || ANNOUNCE_URL.startsWith("PASTE_")){ toast("Announcement set (this device — not synced)"); return; }
+  postAction(ANNOUNCE_URL, {action:"saveannounce", text:txt}).then(r=>{
+    if(r&&r.ok){ toast(txt? "Announcement posted to everyone":"Announcement cleared"); }
+    else{ toast("Set here, but didn't sync", true); }
+  }).catch(()=>toast("Set here, but didn't sync", true));
+}
+
 // change a commodity/grade colour for EVERYONE (writes to the shared sheet)
 function saveSharedColor(key, hex){
   key=(key||"").trim().toLowerCase(); if(!key) return;
@@ -959,6 +1027,7 @@ async function loadAll(){
   loadGrowers();   // refresh the grower directory in the background
   loadDrivers();   // refresh per-transporter driver lists in the background
   loadSharedColors().then(()=>render());   // pull shared colours, then repaint
+  loadAnnounce();   // pull the shared scrolling announcement
   const all=[];
   let anyFail=false, lastErr="";
   // fetch each UNIQUE sheet url once (several booking types can share one sheet)
@@ -2672,6 +2741,8 @@ document.getElementById("refreshBtn").onclick=async()=>{
   await loadAll();
   setTimeout(()=>btn.classList.remove("spinning"), 400);
 };
+document.getElementById("announceBtn").onclick=editAnnounce;
+document.getElementById("ticker").onclick=editAnnounce;
 
 /* ---------- demo data (used until sheet URLs are added) ---------- */
 function DEMO_JOBS(){
