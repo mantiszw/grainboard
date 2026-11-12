@@ -483,14 +483,12 @@
 </head>
 <body>
   <div class="topbar">
-    <!-- LEFT: brand + grid buttons -->
+    <!-- LEFT: brand + commodity filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.1</span></div>
-      <div class="gridtoggle">
-        <button id="gridAll" class="on">Both grids</button>
-        <button id="grid1">Grid 1</button>
-        <button id="grid2">Grid 2</button>
-      </div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.3</span></div>
+      <select class="filter-sel" id="commodityFilter">
+        <option value="__ALL__">All commodities</option>
+      </select>
     </div>
 
     <!-- CENTRE: date navigation + Today + Week/Day -->
@@ -507,8 +505,13 @@
       </div>
     </div>
 
-    <!-- RIGHT: transporter filter + status -->
+    <!-- RIGHT: grid buttons + transporter filter + status -->
     <div class="filters">
+      <div class="gridtoggle">
+        <button id="gridAll" class="on">Both grids</button>
+        <button id="grid1">Grid 1</button>
+        <button id="grid2">Grid 2</button>
+      </div>
       <label class="cxlbl"><input type="checkbox" id="hideCancelled"> Hide cancelled</label>
       <select class="filter-sel" id="transporterFilter">
         <option value="__ALL__">All transporters</option>
@@ -726,6 +729,7 @@ let STATE = {
   dayDate: new Date(),    // which single day is shown in day view
   jobs: [],              // merged, normalised
   filter: "__ALL__",
+  commodityFilter: "__ALL__",   // filter by commodity (stacks with transporter)
   gridFilter: 0,         // 0 = both grids, 1 = only Grid 1, 2 = only Grid 2
   hideCancelled: false,  // cancelled loads SHOWN by default; toggle hides them
   loadedOnce: false,
@@ -1015,10 +1019,32 @@ function buildTransporterFilter(){
     SHEETS.filter(s=>have.includes(s.key)).map(s=>`<option value="${s.key}">${s.name}</option>`).join("");
   sel.value=STATE.filter;
 }
+let _commoditySig="";
+function buildCommodityFilter(){
+  const sel=document.getElementById("commodityFilter");
+  if(!sel) return;
+  // distinct commodities currently on the board, sorted A–Z
+  const seen=new Map();   // lower -> display
+  STATE.jobs.forEach(j=>{ const c=(j.commodity||"").trim(); if(c && !seen.has(c.toLowerCase())) seen.set(c.toLowerCase(), c); });
+  const list=[...seen.values()].sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+  const sig=list.join("|");
+  // only rebuild the <option> list when the set of commodities actually changed
+  // (avoids closing the dropdown mid-click on every render)
+  if(sig!==_commoditySig){
+    _commoditySig=sig;
+    sel.innerHTML='<option value="__ALL__">All commodities</option>'+
+      list.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  }
+  // keep current selection if still present, else reset to All
+  const cur=STATE.commodityFilter;
+  if(cur!=="__ALL__" && !seen.has(cur.toLowerCase())) STATE.commodityFilter="__ALL__";
+  if(sel.value!==STATE.commodityFilter) sel.value=STATE.commodityFilter;
+}
 function buildLegend(){/* legend removed */}
 
 function render(){
   if(typeof killStrayBands==="function" && !band) killStrayBands();  // no stranded selection boxes
+  if(typeof buildCommodityFilter==="function") buildCommodityFilter();  // keep commodity list current
   const cal=document.getElementById("cal");
   document.getElementById("state").style.display = STATE.jobs.length||STATE.loadedOnce ? "none":"flex";
 
@@ -1069,6 +1095,8 @@ function render(){
   const nowMin=new Date().getHours()*60+new Date().getMinutes();
   const filtered=STATE.jobs.filter(j=>
     (STATE.filter==="__ALL__"||j.sheetKey===STATE.filter) &&
+    (STATE.commodityFilter==="__ALL__"||
+      (j.commodity||"").trim().toLowerCase()===STATE.commodityFilter.toLowerCase()) &&
     // cancelled loads stay visible (struck through) by default; hide only if toggled
     (!STATE.hideCancelled || !/^cancel/i.test(j.apptStatus||""))
   );
@@ -2618,6 +2646,7 @@ document.getElementById("gridAll").onclick=()=>setGrid(0);
 document.getElementById("grid1").onclick=()=>setGrid(1);
 document.getElementById("grid2").onclick=()=>setGrid(2);
 document.getElementById("transporterFilter").onchange=(e)=>{STATE.filter=e.target.value;render();};
+document.getElementById("commodityFilter").onchange=(e)=>{STATE.commodityFilter=e.target.value;render();};
 document.getElementById("hideCancelled").onchange=(e)=>{STATE.hideCancelled=e.target.checked;render();};
 document.getElementById("refreshBtn").onclick=async()=>{
   const btn=document.getElementById("refreshBtn"); btn.classList.add("spinning");
