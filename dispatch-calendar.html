@@ -60,6 +60,10 @@
     padding:10px 16px;border-bottom:1px solid var(--grid-line-strong);
     background:var(--header-bg);
   }
+  /* left zone: brand + grid buttons */
+  .left-zone{display:flex;align-items:center;gap:12px}
+  /* centre zone: date nav + Today + Week/Day, horizontally centred */
+  .centre-nav{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;min-width:0}
   .brand{font-size:15px;font-weight:800;letter-spacing:-0.01em;color:var(--ink);white-space:nowrap}
   .brand .sub{font-weight:600;color:var(--accent);margin-left:7px;font-size:12px;letter-spacing:0.02em}
   .brand .ver{font-weight:600;color:var(--ink-faint);margin-left:7px;font-size:10px;letter-spacing:0}
@@ -477,24 +481,32 @@
 </head>
 <body>
   <div class="topbar">
-    <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v2.8</span></div>
-    <div class="nav">
-      <button class="navbtn" id="prev" title="Previous">‹</button>
-      <button class="today-btn" id="today">Today</button>
-      <button class="navbtn" id="next" title="Next">›</button>
-    </div>
-    <div class="viewtoggle">
-      <button id="viewWeek" class="on">Week</button>
-      <button id="viewDay">Day</button>
-    </div>
-    <div class="weeklabel" id="weeklabel">—</div>
-    <div class="spacer"></div>
-    <div class="filters">
+    <!-- LEFT: brand + grid buttons -->
+    <div class="left-zone">
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.0</span></div>
       <div class="gridtoggle">
         <button id="gridAll" class="on">Both grids</button>
         <button id="grid1">Grid 1</button>
         <button id="grid2">Grid 2</button>
       </div>
+    </div>
+
+    <!-- CENTRE: date navigation + Today + Week/Day -->
+    <div class="centre-nav">
+      <div class="nav">
+        <button class="navbtn" id="prev" title="Previous">‹</button>
+        <button class="today-btn" id="today">Today</button>
+        <button class="navbtn" id="next" title="Next">›</button>
+      </div>
+      <div class="weeklabel" id="weeklabel">—</div>
+      <div class="viewtoggle">
+        <button id="viewWeek" class="on">Week</button>
+        <button id="viewDay">Day</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: transporter filter + status -->
+    <div class="filters">
       <label class="cxlbl"><input type="checkbox" id="hideCancelled"> Hide cancelled</label>
       <select class="filter-sel" id="transporterFilter">
         <option value="__ALL__">All transporters</option>
