@@ -485,7 +485,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.4</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v3.6</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -557,12 +557,11 @@ const OTHER_URL = "https://script.google.com/macros/s/AKfycbz_JyXw5sNAVoIKTwx_h7
 const SHEETS = [
   { key:"MK",       name:"M&K Bulk Transport",     short:"M&K",   color:"#2563c9", url:"https://script.google.com/macros/s/AKfycbwQ7KknnYntj7oz859R2u_HueNXXyc8-W0o3LOBqNjGPlUxl_vQiny78NqJmaYMD-nvJA/exec" },
   { key:"MARLEYS",  name:"Marleys",                short:"MARLEYS",color:"#cc2b2b", url:"https://script.google.com/macros/s/AKfycbw1yCJymg-OX8Cu7vjQdQvhc6mOKcPbjthcLZE36HDyGksK6WdbPqCV9ylpeCABrWhM/exec" },
-  { key:"SIDHU",    name:"Sidhu Trucking",         short:"SIDHU", color:"#0d9488", url:"https://script.google.com/macros/s/AKfycbyZ5iLPj1eQ1L-aMCFvjTuf-L78br6tXLFz7mLMUX_a1NtfmsjZtzK82OX0DSIfslcK/exec" },
+  { key:"SIDHU",    name:"Sidhu Trucklines",       short:"SIDHU", color:"#0d9488", url:"https://script.google.com/macros/s/AKfycbyZ5iLPj1eQ1L-aMCFvjTuf-L78br6tXLFz7mLMUX_a1NtfmsjZtzK82OX0DSIfslcK/exec" },
   { key:"OWN",      name:"Growers own / Delivered", short:"OWN",  color:"#6a5acd", url:OTHER_URL },
   { key:"PINGELLY", name:"Pingelly (country site)", short:"PING", color:"#c2873b", url:OTHER_URL },
   { key:"WAGIN",    name:"Wagin (country site)",    short:"WAGIN",color:"#b5523f", url:OTHER_URL },
   { key:"WILLIAMS", name:"Williams (country site)", short:"WILL", color:"#7a8b2e", url:OTHER_URL },
-  { key:"GURWINDER",name:"Gurwinder Transport",     short:"GURW", color:"#8e44ad", url:OTHER_URL },
   // add future transporters here: { key:"GENY", name:"GEN Y", short:"GENY", color:"#b4529e", url:"..." },
 ];
 function sheetMeta(key){ return SHEETS.find(s=>s.key===key) || {short:key, color:"#9aa0a6", name:key}; }
