@@ -576,7 +576,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v4.6</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v4.8</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -737,9 +737,11 @@ function renderTonstrip(filtered, days){
   if(!strip) return;
   // only the VISIBLE date range (this week, or just this day in Day view)
   const visKeys=new Set(days.map(d=>dayKey(d)));
-  // count real (non-cancelled, non-busy) loads within the visible days only
+  // count only loads that actually RENDER as blocks: non-cancelled, non-busy,
+  // with a real date AND time (j.tipMin != null), within the visible days.
+  // (a dated-but-no-time row is invisible on the board, so it mustn't be tallied)
   const loads=filtered.filter(j=>!j.isBusy && !/^cancel/i.test(j.apptStatus||"")
-    && j.tipDate && visKeys.has(dayKey(j.tipDate)));
+    && j.tipDate && j.tipMin!=null && visKeys.has(dayKey(j.tipDate)));
   if(!loads.length){ strip.className="tonstrip"; strip.innerHTML=""; return; }
 
   if(STATE.commodityFilter!=="__ALL__"){
@@ -1252,7 +1254,7 @@ async function loadAll(){
       }
     }catch(e){ anyFail=true; lastErr=String(e&&e.message||e); console.error("[dispatch] load fail:", s.name, e); }
   }));
-  STATE.jobs=all.filter(Boolean);
+  STATE.jobs=applyRecentMoves(all.filter(Boolean));   // don't let a stale reread revert a just-moved booking
   STATE.loadedOnce=true;
   buildTransporterFilter();
   render();
@@ -1978,6 +1980,7 @@ async function onGroupUp(e){
     tipDate:isoDate(job.tipDate), tipTime:minToSheetTime(job.tipMin) }));
   const results=await Promise.all(writes);
   if(results.every(Boolean)){
+    g.items.forEach(({job})=>markRecentMove(job));   // guard each against a stale reread
     toast(`Moved ${g.items.length} bookings`);
   }else{
     prev.forEach(p=>{ p.job.tipDate=p.tipDate; p.job.tipMin=p.tipMin; });
@@ -2071,6 +2074,7 @@ async function onUp(e){
     tipDate:isoDate(newDate), tipTime:minToSheetTime(min) };
   const ok=await writeBack(job, payload);
   if(ok){
+    markRecentMove(job);   // guard against a stale reread snapping it back
     toast(`Moved to ${WD[newDate.getDay()]} ${newDate.getDate()} ${MONTHS[newDate.getMonth()]} · ${minToLabel(min)} · Grid ${grid}`);
   }else{
     // revert
@@ -2085,6 +2089,45 @@ function daysBetweenKeys(a,b){ return Math.round((dateFromKey(b)-dateFromKey(a))
 function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
 let PENDING_WRITES=0;   // in-flight sheet writes; auto-refresh waits for these
+
+/* ---- recently-moved guard --------------------------------------------------
+   After a move/group-move SAVES, the sheet can take a couple of seconds to
+   actually reflect the new position. A background refresh landing in that gap
+   would read the OLD row and snap the booking back on screen (then it "sticks"
+   when you try again, because the sheet has caught up). This guard protects a
+   just-moved booking from being reverted by a stale reread: for a short window
+   we keep the local position unless the sheet confirms it. It clears itself the
+   moment the sheet agrees, or after RECENT_MOVE_MS. It only protects SAVED
+   moves, so a genuine write failure (reverted synchronously in onUp) is never
+   masked. */
+const RECENT_MOVES=new Map();      // id -> {tipKey, tipMin, grid, until}
+const RECENT_MOVE_MS=15000;        // protect for up to 15s or until confirmed
+function markRecentMove(job){
+  RECENT_MOVES.set(job.id, {
+    tipKey: job.tipDate?dayKey(job.tipDate):null,
+    tipMin: job.tipMin, grid: job.grid,
+    until: Date.now()+RECENT_MOVE_MS
+  });
+}
+// reconcile freshly-loaded sheet jobs against anything recently moved
+function applyRecentMoves(jobs){
+  if(!RECENT_MOVES.size) return jobs;
+  const now=Date.now();
+  jobs.forEach(j=>{
+    const g=RECENT_MOVES.get(j.id);
+    if(!g) return;
+    if(now>g.until){ RECENT_MOVES.delete(j.id); return; }   // window elapsed
+    const freshKey=j.tipDate?dayKey(j.tipDate):null;
+    const matches=(freshKey===g.tipKey)&&(j.tipMin===g.tipMin)&&(j.grid===g.grid);
+    if(matches){ RECENT_MOVES.delete(j.id); }               // sheet caught up
+    else {                                                   // still stale → hold local
+      if(g.tipKey!=null) j.tipDate=dateFromKey(g.tipKey);
+      j.tipMin=g.tipMin; j.grid=g.grid;
+    }
+  });
+  return jobs;
+}
+
 async function writeBack(job, payload){
   if(!job.url || job.url.startsWith("PASTE_")){
     return true; // demo mode — pretend success
