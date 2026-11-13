@@ -62,10 +62,19 @@
 
   /* ---- Top bar ---- */
   .topbar{
-    flex-shrink:0;display:flex;align-items:center;gap:14px;
+    flex-shrink:0;display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;
     padding:10px 16px;border-bottom:1px solid var(--grid-line-strong);
     background:var(--header-bg);
   }
+  /* tonnage summary strip under the toolbar — subtle, thin */
+  .tonstrip{flex-shrink:0;display:none;align-items:center;gap:4px 14px;flex-wrap:wrap;
+    padding:5px 16px;font-size:11.5px;color:var(--ink-dim);
+    background:var(--header-bg);border-bottom:1px solid var(--grid-line)}
+  .tonstrip.show{display:flex}
+  .tonstrip .ton-item{white-space:nowrap}
+  .tonstrip .ton-item b{font-weight:800;color:var(--ink)}
+  .tonstrip .ton-total{margin-left:auto;font-weight:800;color:var(--ink)}
+  .tonstrip .ton-lead{font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.03em;font-size:10.5px}
   /* left zone: brand + grid buttons */
   .left-zone{display:flex;align-items:center;gap:12px}
   /* announcement button */
@@ -241,6 +250,12 @@
     background:rgba(0,0,0,.14);color:inherit;white-space:nowrap}
   .ev.darktext .ev-tag{background:rgba(255,255,255,.26)}
   .ev.clash .ev-tag{font-size:8px;margin-left:3px;padding:0 3px}
+  /* longer tag on its own line — shows in full, wraps if needed */
+  .ev-tagline{display:inline-block;margin-top:2px;padding:1px 6px;border-radius:7px;
+    font-size:9.5px;font-weight:700;letter-spacing:-.01em;line-height:1.3;
+    background:rgba(0,0,0,.14);color:inherit;white-space:normal;max-width:100%}
+  .ev.darktext .ev-tagline{background:rgba(255,255,255,.26)}
+  .ev.clash .ev-tagline{font-size:8px;padding:1px 4px}
   .ev .sub{font-weight:500;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
   .ev .tm{font-weight:500;opacity:.7;font-size:9.5px;white-space:nowrap}
   /* clash (narrow, side-by-side) blocks: keep the SAME normal font size as any
@@ -364,9 +379,49 @@
 
   /* legend */
 
-  @media(max-width:640px){
+  /* ---- responsive toolbar: reflow instead of squishing when narrow ---- */
+  /* windowed / tablet: let the centre nav take the full second row if needed */
+  @media(max-width:1100px){
+    .centre-nav{flex:1 1 100%;order:3;justify-content:flex-start;margin-top:2px}
+    .left-zone{flex:0 1 auto}
+    .filters{margin-left:auto}
+  }
+  /* smaller: tighten controls, hide the least-essential labels */
+  @media(max-width:860px){
     .brand .sub{display:none}
-    .weeklabel{min-width:90px;font-size:12px}
+    .announce-btn{font-size:11px;padding:4px 8px}
+    .cxlbl{font-size:11px}
+    .filter-sel{max-width:150px}
+  }
+  /* phones: keep it to ~2 SLIM rows — compact, not a tall stack.
+     Row 1: brand + date nav + Week/Day. Row 2: filters + grids + actions.
+     Everything stays visible, just denser and shorter. */
+  @media(max-width:620px){
+    .topbar{gap:6px 8px;padding:6px 10px}
+    .brand{font-size:14px;flex:none}
+    .brand .sub,.brand .ver{display:none}
+    /* centre nav sits on row 1 next to the brand, compact */
+    .centre-nav{flex:1 1 auto;order:0;justify-content:flex-end;gap:5px;margin-top:0}
+    .weeklabel{min-width:0;font-size:11px;white-space:nowrap}
+    .nav .navbtn,.today-btn{padding:4px 8px;font-size:12px}
+    .viewtoggle button{padding:4px 9px;font-size:12px}
+    /* row 2: all filters + grid buttons + actions, compact and wrapping tightly */
+    .left-zone{flex:1 1 100%;order:2;gap:6px}
+    .filters{flex:1 1 100%;order:3;margin-left:0;gap:6px;flex-wrap:wrap}
+    .filter-sel{flex:1 1 120px;max-width:none;min-width:110px;padding:5px 8px;font-size:12px}
+    .gridtoggle button{padding:4px 8px;font-size:11px}
+    .cxlbl{font-size:11px}
+    /* icon-only action buttons to save width */
+    .announce-btn{font-size:0;padding:5px 7px}
+    .announce-btn::before{content:"📢";font-size:13px}
+    .synced{font-size:0}
+    .synced .status-dot{margin:0}
+  }
+  /* very small phones: let the two filter dropdowns share row 2 full width */
+  @media(max-width:430px){
+    .brand{font-size:13px}
+    .centre-nav{flex:1 1 100%;order:1;justify-content:flex-start;margin-top:2px}
+    .filter-sel{flex:1 1 46%}
   }
 
   /* ---- Edit popup ---- */
@@ -521,7 +576,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v4.2</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v4.5</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -553,6 +608,7 @@
       </div>
       <label class="cxlbl"><input type="checkbox" id="hideCancelled"> Hide cancelled</label>
       <button class="announce-btn" id="announceBtn" title="Set a scrolling announcement for everyone">📢 Announcement</button>
+      <button class="refresh-btn" id="undoBtn" title="Undo last action (Ctrl+Z)" style="display:none">↶</button>
       <button class="refresh-btn" id="refreshBtn" title="Refresh now">⟳</button>
       <span class="synced"><span class="status-dot" id="statusDot"></span><span id="syncedText">Loading…</span></span>
     </div>
@@ -563,6 +619,9 @@
     <span class="ticker-tag">📢</span>
     <div class="ticker-view"><div class="ticker-track" id="tickerTrack"></div></div>
   </div>
+
+  <!-- subtle tonnage summary strip (estimated from loads × per-commodity tonnage) -->
+  <div class="tonstrip" id="tonstrip"></div>
 
   <div class="calwrap" id="calwrap">
     <div class="cal" id="cal"></div>
@@ -666,6 +725,51 @@ function saveCustomColor(name, hex){
      3. built-in grade colour (Nugget pink, OAT2/3 lighter purple, …)
      4. built-in commodity colour
      5. grey (TBC) */
+/* ---- estimated tonnage per load: Oats ≈ 55t, everything else ≈ 63t ---- */
+function loadTons(j){
+  const c=(j.commodity||"").toLowerCase();
+  return /oat/.test(c) ? 55 : 63;
+}
+function fmtT(n){ return Math.round(n).toLocaleString("en-AU")+"t"; }
+// build the tonnage summary strip from the VISIBLE, filtered loads
+function renderTonstrip(filtered, days){
+  const strip=document.getElementById("tonstrip");
+  if(!strip) return;
+  // count real (non-cancelled, non-busy) loads only
+  const loads=filtered.filter(j=>!j.isBusy && !/^cancel/i.test(j.apptStatus||""));
+  if(!loads.length){ strip.className="tonstrip"; strip.innerHTML=""; return; }
+
+  if(STATE.commodityFilter!=="__ALL__"){
+    // FILTERED to one commodity → per-day counts across the visible days + total
+    const label=STATE.commodityFilter;
+    const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    let total=0;
+    const perDay=days.map(d=>{
+      const t=loads.filter(j=>j.tipDate && sameDay(j.tipDate,d)).reduce((s,j)=>s+loadTons(j),0);
+      total+=t; return {d, t};
+    });
+    const items=perDay.filter(x=>x.t>0)
+      .map(x=>`<span class="ton-item">${WD[x.d.getDay()]} <b>${fmtT(x.t)}</b></span>`).join("");
+    strip.innerHTML=`<span class="ton-lead">${esc(label)}</span>`+
+      (items||`<span class="ton-item">no loads in view</span>`)+
+      `<span class="ton-total">Total ${fmtT(total)}</span>`;
+  } else {
+    // ALL commodities → per-commodity breakdown + grand total
+    const by=new Map();   // display name -> tons
+    let total=0;
+    loads.forEach(j=>{
+      const name=(j.commodity||"—").trim()||"—";
+      const t=loadTons(j); total+=t;
+      by.set(name,(by.get(name)||0)+t);
+    });
+    const items=[...by.entries()].sort((a,b)=>b[1]-a[1])
+      .map(([n,t])=>`<span class="ton-item">${esc(n)} <b>${fmtT(t)}</b></span>`).join("");
+    strip.innerHTML=`<span class="ton-lead">≈ Booked</span>`+items+
+      `<span class="ton-total">Total ${fmtT(total)}</span>`;
+  }
+  strip.className="tonstrip show";
+}
+
 function colorKey(commodity, grade){
   const c=(commodity||"").toLowerCase().trim();
   const g=(grade||"").toLowerCase().trim();
@@ -871,6 +975,82 @@ async function loadDrivers(){
 // the driver option list for a given transporter (sheetKey), always an array
 function driversFor(sheetKey){
   return (STATE.drivers && STATE.drivers[sheetKey]) ? STATE.drivers[sheetKey] : [];
+}
+
+/* ---- single-level UNDO (like Ctrl+Z for the last board action) ----
+   Before a mutating action we snapshot the jobs it will touch; Undo restores
+   them (locally + writes the previous values back to the sheets). Covers move,
+   edit, cancel, delete, group-move and bulk-commodity. One level deep — undoing
+   the most recent action, which is what "oops" almost always needs. */
+let UNDO=null;   // { label, before:[{job-copy}], createdIds:[], deletedSnaps:[] }
+function jobSnap(j){ return JSON.parse(JSON.stringify({
+  id:j.id, sheetKey:j.sheetKey, url:j.url, site:j.site, release:j.release,
+  contact:j.contact, phone:j.phone, maps:j.maps, driver:j.driver, note:j.note,
+  notes:j.notes, tag:j.tag, commodity:j.commodity, grade:j.grade, grid:j.grid,
+  duration:j.duration, apptStatus:j.apptStatus, status:j.status,
+  tipDate:j.tipDate?isoDate(j.tipDate):null, tipMin:j.tipMin
+})); }
+// capture the before-state of the given jobs (by id). createdIds = ids that are
+// NEW in this action (undo deletes them); deletedSnaps = full snaps of rows this
+// action deletes (undo re-creates them).
+function captureUndo(label, jobs, opts){
+  opts=opts||{};
+  UNDO={ label, before:(jobs||[]).map(jobSnap),
+         createdIds:(opts.createdIds||[]).slice(),
+         deletedSnaps:(opts.deletedSnaps||[]).map(jobSnap) };
+  updateUndoBtn();
+}
+function updateUndoBtn(){
+  const b=document.getElementById("undoBtn"); if(!b) return;
+  if(UNDO){ b.style.display=""; b.title="Undo: "+UNDO.label+"  (Ctrl+Z)"; }
+  else b.style.display="none";
+}
+async function doUndo(){
+  if(!UNDO){ toast("Nothing to undo"); return; }
+  const u=UNDO; UNDO=null; updateUndoBtn();
+  const writes=[];
+  // 1) remove anything this action CREATED
+  (u.createdIds||[]).forEach(id=>{
+    const j=STATE.jobs.find(x=>x.id===id);
+    STATE.jobs=STATE.jobs.filter(x=>x.id!==id);
+    if(j && j.url && !/^tmp/.test(id)) writes.push(postAction(j.url,{action:"delete",id}));
+  });
+  // 2) restore changed jobs to their previous values
+  (u.before||[]).forEach(s=>{
+    const j=STATE.jobs.find(x=>x.id===s.id);
+    if(j){
+      j.site=s.site; j.release=s.release; j.contact=s.contact; j.phone=s.phone;
+      j.maps=s.maps; j.driver=s.driver; j.note=s.note; j.notes=s.notes; j.tag=s.tag;
+      j.commodity=s.commodity; j.grade=s.grade; j.grid=s.grid; j.duration=s.duration;
+      j.apptStatus=s.apptStatus; j.status=s.status;
+      j.tipDate=s.tipDate?parseDate(s.tipDate):j.tipDate; j.tipMin=s.tipMin;
+      if(j.url && !/^tmp/.test(j.id)){
+        writes.push(postAction(j.url,{action:"update",id:j.id,fields:{
+          site:s.site, release:s.release, contact:s.contact, phone:s.phone, maps:s.maps,
+          driver:s.driver, notes:s.notes, tag:s.tag, commodity:s.commodity, grade:s.grade,
+          grid:String(s.grid), duration:String(s.duration),
+          tipDate:s.tipDate, tipTime:minToSheetTime(s.tipMin), apptStatus:s.apptStatus
+        }}));
+      }
+    }
+  });
+  // 3) re-create anything this action DELETED
+  (u.deletedSnaps||[]).forEach(s=>{
+    const tmp="tmp"+Math.random().toString(36).slice(2,8);
+    STATE.jobs.push({ id:tmp, sheetKey:s.sheetKey, url:s.url, site:s.site, release:s.release,
+      contact:s.contact, phone:s.phone, maps:s.maps, driver:s.driver, note:s.note, notes:s.notes,
+      tag:s.tag, commodity:s.commodity, grade:s.grade, grid:s.grid, duration:s.duration,
+      apptStatus:s.apptStatus, status:s.status, tipDate:s.tipDate?parseDate(s.tipDate):null, tipMin:s.tipMin });
+    writes.push(postAction(s.url,{action:"create",fields:{
+      site:s.site, release:s.release, contact:s.contact, phone:s.phone, maps:s.maps, driver:s.driver,
+      notes:s.notes, tag:s.tag, commodity:s.commodity, grade:s.grade, grid:String(s.grid),
+      duration:String(s.duration), tipDate:s.tipDate, tipTime:minToSheetTime(s.tipMin),
+      apptStatus:s.apptStatus, transporter:s.sheetKey
+    }}).then(r=>{ if(r&&r.ok&&r.id){ const jj=STATE.jobs.find(x=>x.id===tmp); if(jj) jj.id=r.id; } }));
+  });
+  render();
+  toast("Undone: "+u.label);
+  try{ await Promise.all(writes); }catch(e){ loadAll(); }
 }
 
 /* ---- scrolling announcement ticker (shared via the Other sheet) ---- */
@@ -1204,6 +1384,7 @@ function render(){
     // cancelled loads stay visible (struck through) by default; hide only if toggled
     (!STATE.hideCancelled || !/^cancel/i.test(j.apptStatus||""))
   );
+  renderTonstrip(filtered, days);
 
   days.forEach((d,di)=>{
     const today=sameDay(d,new Date());
@@ -1521,7 +1702,10 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const flag = note ? `<span class="ev-flag" title="${esc(note)}">📩</span>` : "";
   // per-booking visible tag (e.g. "25t") — shows as a pill beside the name, this load only
   const tag=(j.tag||"").trim();
-  const tagPill = tag ? `<span class="ev-tag" title="${esc(tag)}">${esc(tag)}</span>` : "";
+  // short tags sit inline after the name; longer ones get their own line so they
+  // always show in full (e.g. "TBC - WEATHER DEPENDENT") instead of being clipped
+  const tagInline = (tag && tag.length<=8) ? `<span class="ev-tag" title="${esc(tag)}">${esc(tag)}</span>` : "";
+  const tagRow = (tag && tag.length>8) ? `<div class="ev-tagline" title="${esc(tag)}">${esc(tag)}</div>` : "";
   return `<div class="ev ${cls}${compact}${snug}${dark}${clash?' clash':''}" data-id="${j.id}" data-sheet="${j.sheetKey}"
        data-stack="${cols>1?1:0}" data-z="${z}"
        title="${esc(line1)}${tag?(' ['+esc(tag)+']'):''} — ${esc(commGrade)} · ${esc(meta.name)}${driver?(' · '+esc(driver)):''}${note?(' · 📝 '+esc(note)):''} · ${timeRange} · Grid ${gridNo}${clash?' · double booking':''}"
@@ -1529,7 +1713,8 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
     ${transBadge}
     ${flag}
     ${cancelled?`<span class="cxtag">CANCELLED</span>`:driverBadge}
-    <div class="title">${esc(line1)}${tagPill}</div>
+    <div class="title">${esc(line1)}${tagInline}</div>
+    ${tagRow}
     <div class="sub">${esc(commGrade)}${snug?`<span class="sub-tm">${esc(timeRange)}</span>`:""}</div>
     <div class="tm">${line3}</div>
     <div class="resize-handle"></div>
@@ -1619,6 +1804,7 @@ async function applyBulkCommodity(){
   const ids=[...SELECTED];
   const items=ids.map(id=>STATE.jobs.find(j=>j.id===id)).filter(Boolean);
   closeBulkCommodity();
+  captureUndo(`set ${items.length} to ${o.label}`, items);   // snapshot for Ctrl+Z
   // optimistic: apply commodity+grade locally, remember previous to revert
   const prev=items.map(j=>({job:j, commodity:j.commodity, grade:j.grade}));
   items.forEach(j=>{ j.commodity=o.commodity; j.grade=o.grade; });
@@ -1771,6 +1957,7 @@ async function onGroupUp(e){
 
   if(dayDelta===0 && minDelta===0){ render(); return; }
 
+  captureUndo(`move ${g.items.length} bookings`, g.items.map(i=>i.job));   // snapshot for Ctrl+Z
   // apply the SAME offset to every selected block, clamped to day bounds
   const prev=g.items.map(i=>({job:i.job, tipDate:i.job.tipDate, tipMin:i.job.tipMin}));
   g.items.forEach(({job})=>{
@@ -1870,6 +2057,7 @@ async function onUp(e){
   const changed = (dayKey(job.tipDate)!==newDayKey) || (job.tipMin!==min) || (job.grid!==grid);
   if(!changed){ render(); drag=null; return; }
 
+  captureUndo("move booking", [job]);     // snapshot for Ctrl+Z
   // optimistic update
   const prev={tipDate:job.tipDate,tipMin:job.tipMin,grid:job.grid};
   job.tipDate=newDate; job.tipMin=min; job.grid=grid;
@@ -2236,7 +2424,7 @@ function renderEditor(){
       </div>
       <div class="m-field">
         <span class="ic">🏷️</span>
-        <input class="lineinput" id="editTag" type="text" value="${esc(EDIT.tag||'')}" placeholder="Tag — shows beside the name (e.g. 25t, HALF LOAD)" maxlength="24"
+        <input class="lineinput" id="editTag" type="text" value="${esc(EDIT.tag||'')}" placeholder="Tag — shows on the booking (e.g. 25t, TBC - WEATHER DEPENDENT)" maxlength="60"
                oninput="EDIT.tag=this.value">
       </div>
       <div class="m-field two-col">
@@ -2516,6 +2704,10 @@ function saveAppt(){
   if(EDIT.isNew && !(EDIT.services[0] && EDIT.services[0].commodity)){
     toast("Pick a commodity first", true); return;
   }
+  // snapshot for Ctrl+Z when editing an existing booking (remember its prior state)
+  if(!EDIT.isNew && EDIT.origIds && EDIT.origIds.length){
+    captureUndo("edit booking", EDIT.origIds.map(id=>STATE.jobs.find(j=>j.id===id)).filter(Boolean));
+  }
   // transporter changed to a DIFFERENT SHEET → move the load there
   if(!EDIT.isNew && EDIT.origUrl && EDIT.url!==EDIT.origUrl){
     return moveToTransporter();
@@ -2674,6 +2866,7 @@ function cancelAppt(){
   if(!confirm("Cancel this load? It stays on record (struck through) but is marked Cancelled.")) return;
   const url=EDIT.url;
   const ids=EDIT.origIds.slice();
+  captureUndo("cancel load", ids.map(id=>STATE.jobs.find(x=>x.id===id)).filter(Boolean));  // snapshot for Ctrl+Z
   // optimistic: mark cancelled locally (don't remove)
   ids.forEach(id=>{ const j=STATE.jobs.find(x=>x.id===id); if(j) j.apptStatus="Cancelled"; });
   closeEditor();
@@ -2688,9 +2881,11 @@ function cancelAppt(){
 /* permanently REMOVE a load — deletes its row(s) from the sheet (not kept on record) */
 function deleteAppt(){
   const n=EDIT.origIds.length;
-  if(!confirm(`Delete this load completely?\n\nIt will be removed from the Grainboard and the spreadsheet (not kept on record). This can't be undone.`)) return;
+  if(!confirm(`Delete this load completely?\n\nIt will be removed from the Grainboard and the spreadsheet. You can Undo (Ctrl+Z) right after if it was a mistake.`)) return;
   const url=EDIT.url;
   const ids=EDIT.origIds.slice();
+  const deleted=ids.map(id=>STATE.jobs.find(j=>j.id===id)).filter(Boolean);
+  captureUndo("delete load", [], {deletedSnaps:deleted});   // snapshot so Undo re-creates it
   // optimistic: remove locally
   STATE.jobs=STATE.jobs.filter(j=>!ids.includes(j.id));
   closeEditor();
@@ -2778,6 +2973,15 @@ document.getElementById("refreshBtn").onclick=async()=>{
 };
 document.getElementById("announceBtn").onclick=editAnnounce;
 document.getElementById("ticker").onclick=editAnnounce;
+document.getElementById("undoBtn").onclick=doUndo;
+// Ctrl+Z / Cmd+Z → undo last board action (ignore while typing in a field)
+document.addEventListener("keydown",(e)=>{
+  if((e.ctrlKey||e.metaKey) && (e.key==="z"||e.key==="Z") && !e.shiftKey){
+    const t=e.target, tag=(t&&t.tagName)||"";
+    if(/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t&&t.isContentEditable)) return; // let fields do their own undo
+    e.preventDefault(); doUndo();
+  }
+});
 
 /* ---------- demo data (used until sheet URLs are added) ---------- */
 function DEMO_JOBS(){
