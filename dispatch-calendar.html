@@ -576,7 +576,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v4.5</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v4.6</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -735,8 +735,11 @@ function fmtT(n){ return Math.round(n).toLocaleString("en-AU")+"t"; }
 function renderTonstrip(filtered, days){
   const strip=document.getElementById("tonstrip");
   if(!strip) return;
-  // count real (non-cancelled, non-busy) loads only
-  const loads=filtered.filter(j=>!j.isBusy && !/^cancel/i.test(j.apptStatus||""));
+  // only the VISIBLE date range (this week, or just this day in Day view)
+  const visKeys=new Set(days.map(d=>dayKey(d)));
+  // count real (non-cancelled, non-busy) loads within the visible days only
+  const loads=filtered.filter(j=>!j.isBusy && !/^cancel/i.test(j.apptStatus||"")
+    && j.tipDate && visKeys.has(dayKey(j.tipDate)));
   if(!loads.length){ strip.className="tonstrip"; strip.innerHTML=""; return; }
 
   if(STATE.commodityFilter!=="__ALL__"){
