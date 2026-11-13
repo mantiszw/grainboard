@@ -25,7 +25,7 @@
     --now-line:#e04a3a;
     --accent:#b8860b;
     --lane-divider:#c9c9d0;
-    --day-divider:#a8adb8;   /* line between days — light, 1px */
+    --day-divider:#a8adb8;   /* line between days — light, 1px (bolder only in both-grids view) */
     --grid2-tint:rgba(70,110,160,.055);  /* faint wash on Grid 2 half */
     --offhour:#f4f4f6;
 
@@ -483,6 +483,11 @@
   .cal.both-grids .ev-trans{padding:1px 4px}
   /* with the ribbon now tiny, the name can run almost to the edge */
   .cal.both-grids .ev .title{padding-right:20px}
+  /* bolder day dividers ONLY in both-grids view (days are busier there) */
+  .cal.both-grids .daycol{border-left-width:2px;border-left-color:#8d93a0}
+  .cal.both-grids .daycol:last-child{border-right-width:2px;border-right-color:#8d93a0}
+  .cal.both-grids .dayhead{border-left-width:2px;border-left-color:#8d93a0}
+  .cal.both-grids .dayhead:last-of-type{border-right-width:2px;border-right-color:#8d93a0}
   /* multi-select: rubber-band box, highlighted & selected blocks, toolbar */
   #bandBox, .band-box{position:fixed;z-index:8000;border:1.5px solid #2563c9;
     background:rgba(37,99,201,.12);border-radius:4px;pointer-events:none}
@@ -576,7 +581,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v4.8</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.0</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
