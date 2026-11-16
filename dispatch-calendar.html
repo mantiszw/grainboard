@@ -228,10 +228,10 @@
   .ev:active{cursor:grabbing}
   /* overlap = double-booking: just a thin white border separates the blocks */
   .ev.clash{border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.12)}
-  /* TBC = load not yet confirmed: thick DOTTED border in the commodity colour,
-     so unconfirmed loads stand out at a glance without changing the fill. */
-  .ev.tbc{border:3px dotted var(--evc,#888);padding:0 5px}
-  .ev.tbc.clash{border:3px dotted var(--evc,#888)}  /* keep dotted even when double-booked */
+  /* TBC = load not yet confirmed: bold RED dotted border so unconfirmed loads
+     stand out loudly at a glance, without changing the commodity fill colour. */
+  .ev.tbc{border:4px dotted #e01010;padding:0 4px}
+  .ev.tbc.clash{border:4px dotted #e01010}  /* keep the red dots even when double-booked */
   /* a clashing block pops to FULL grid-half width on hover/tap so you can read
      it, then settles back — the quick way to read a double-booking */
   .ev[data-stack="1"]:hover, .ev[data-stack="1"].peek{
@@ -599,7 +599,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.5</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.6</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
