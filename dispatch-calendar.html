@@ -595,7 +595,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.2</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.4</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -677,7 +677,7 @@
 const OTHER_URL = "https://script.google.com/macros/s/AKfycbz_JyXw5sNAVoIKTwx_h7zZvioBdD0L6En3HwI48oWJUChcRTzeu1YcBvDT1OC5Vghv/exec";   // one catch-all sheet for the rest (Own, Delivered, country sites)
 const SHEETS = [
   { key:"MK",       name:"M&K Bulk Transport",     short:"M&K",   color:"#2563c9", url:"https://script.google.com/macros/s/AKfycbwQ7KknnYntj7oz859R2u_HueNXXyc8-W0o3LOBqNjGPlUxl_vQiny78NqJmaYMD-nvJA/exec" },
-  { key:"MARLEYS",  name:"Marleys",                short:"MARLEYS",color:"#cc2b2b", url:"https://script.google.com/macros/s/AKfycbz1-OjmSnrEJSxFRmgm241rMmWGvtmXMkywI48CUBnDQsnVUsBDOwChsNuztk60rOx-/exec" },
+  { key:"MARLEYS",  name:"Marleys",                short:"MARLEYS",color:"#cc2b2b", url:"https://script.google.com/macros/s/AKfycbxtXOiEZhnUlESG2Ck1Anln_2ZJpv1bYCKQeFQb2lTfAMyAaW_Tnyux_oce3jsMXP0/exec" },
   { key:"SIDHU",    name:"Sidhu Trucklines",       short:"SIDHU", color:"#0d9488", url:"https://script.google.com/macros/s/AKfycbyZ5iLPj1eQ1L-aMCFvjTuf-L78br6tXLFz7mLMUX_a1NtfmsjZtzK82OX0DSIfslcK/exec" },
   { key:"OWN",      name:"Growers own / Delivered", short:"OWN",  color:"#6a5acd", url:OTHER_URL },
   { key:"PINGELLY", name:"Pingelly (country site)", short:"PING", color:"#c2873b", url:OTHER_URL },
@@ -1338,6 +1338,7 @@ async function loadAll(){
   }));
   STATE.jobs=applyRecentMoves(all.filter(Boolean));   // don't let a stale reread revert a just-moved booking
   STATE.loadedOnce=true;
+  backfillNgrs();      // auto-fill blank NGRs from the grower directory + write back
   buildTransporterFilter();
   render();
   const now=new Date();
@@ -1346,6 +1347,47 @@ async function loadAll(){
     : ("Synced · "+now.toLocaleTimeString("en-AU",{hour:"numeric",minute:"2-digit"}));
   setSynced(label, !anyFail);
   if(anyFail) console.warn("[dispatch] "+STATE.jobs.length+" jobs loaded; last error:", lastErr);
+}
+
+/* Auto-fill blank NGRs from the grower directory and write them back to the
+   sheet, so the lab sees the NGR without anyone opening each booking.
+   - Only fills a booking whose NGR is blank.
+   - Only when the grower has exactly ONE NGR on record (a multi-NGR grower
+     must be chosen deliberately — we never guess which of two).
+   - Writes back in the background, throttled, blanks-only, saved rows only.
+   - Remembers what it has written so repeated refreshes don't rewrite. */
+const _ngrBackfilled=new Set();
+function ngrForJob(j){
+  const g = growerByFarm(j.release) || growerByFarm(j.site)
+          || STATE.growers[String(j.site||"").trim().toLowerCase()];
+  if(!g) return "";
+  if(Array.isArray(g.ngrs) && g.ngrs.length) return g.ngrs.length===1 ? (g.ngrs[0].val||g.ngrs[0]) : "";
+  return g.ngr || "";
+}
+function backfillNgrs(){
+  const todo=[];
+  STATE.jobs.forEach(j=>{
+    if(j.isBusy) return;
+    if((j.ngr||"").trim()) return;              // already has one
+    if(/^tmp/.test(j.id||"")) return;           // not yet saved
+    if(_ngrBackfilled.has(j.id)) return;        // done already this session
+    const ngr=ngrForJob(j);
+    if(!ngr) return;                            // no single match → leave blank
+    j.ngr=ngr;                                  // fill on screen now
+    _ngrBackfilled.add(j.id);
+    todo.push({ job:j, ngr });
+  });
+  if(!todo.length) return;
+  render();                                     // show the filled NGRs immediately
+  // write back gently in the background (don't hammer Apps Script)
+  let i=0;
+  (function next(){
+    if(i>=todo.length) return;
+    const {job,ngr}=todo[i++];
+    postAction(job.url, { action:"update", id:job.id, fields:{ ngr } })
+      .catch(()=>{})
+      .finally(()=>setTimeout(next, 250));       // ~4 writes/sec, easy on the script
+  })();
 }
 
 function normalise(r, sheet){
@@ -2295,6 +2337,13 @@ function openEditor(job){
   };
   // the tapped job first
   EDIT.services.sort((a,b)=> a.id===job.id?-1:b.id===job.id?1:0);
+  // fill a MISSING NGR from the grower directory (existing bookings predate NGRs).
+  // only when the grower has exactly one on record — a multi-NGR grower must be
+  // picked deliberately, so we leave it blank for the dropdown.
+  if(!EDIT.ngr){
+    const opts=ngrOptionsFor(EDIT);
+    if(opts.length===1) EDIT.ngr=opts[0].val;
+  }
   renderEditor();
   document.getElementById("editBackdrop").style.display="flex";
 }
