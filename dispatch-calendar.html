@@ -228,6 +228,10 @@
   .ev:active{cursor:grabbing}
   /* overlap = double-booking: just a thin white border separates the blocks */
   .ev.clash{border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.12)}
+  /* TBC = load not yet confirmed: thick DOTTED border in the commodity colour,
+     so unconfirmed loads stand out at a glance without changing the fill. */
+  .ev.tbc{border:3px dotted var(--evc,#888);padding:0 5px}
+  .ev.tbc.clash{border:3px dotted var(--evc,#888)}  /* keep dotted even when double-booked */
   /* a clashing block pops to FULL grid-half width on hover/tap so you can read
      it, then settles back — the quick way to read a double-booking */
   .ev[data-stack="1"]:hover, .ev[data-stack="1"].peek{
@@ -595,7 +599,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.4</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.5</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1783,7 +1787,8 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   // solid when Confirmed, striped (scheduled) when pencilled-in/blank
   const cancelled = /^cancel/i.test(j.apptStatus||"");
   const confirmed = /^conf/i.test(j.apptStatus||"") || j.arrived;
-  const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "");
+  const tbc = /^tbc/i.test(j.apptStatus||"");   // to-be-confirmed → dotted commodity-colour border
+  const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "") + (tbc ? " tbc" : "");
   const dark = isDarkColor(cvar) ? " darktext" : "";
   // Line 1 = Release/Farm #; Line 2 = Commodity — Grade; Line 3 = time (driver only in the badge)
   const line1 = j.release || j.site || "—";
@@ -2629,6 +2634,7 @@ function renderEditor(){
         <div class="seg">
           <button class="${apptStatus==='Pencilled'?'on':''}" onclick="setApptStatus('Pencilled')">Pencilled-in</button>
           <button class="${apptStatus==='Confirmed'?'on':''}" onclick="setApptStatus('Confirmed')">Confirmed</button>
+          <button class="${apptStatus==='TBC'?'on':''}" onclick="setApptStatus('TBC')">TBC</button>
         </div>
         <div class="ngr-box${ngrOptionsFor(EDIT).length>1&&!EDIT._ngrCustom?' ngr-has-sel':''}">
           <span class="ngr-lbl">NGR:</span>
