@@ -611,7 +611,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.7</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.8</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -2842,9 +2842,28 @@ function resolveHex(cssVal){
 
 /* palette of colours staff can choose for a new commodity */
 const COMMODITY_PALETTE = [
-  "#b9a4e8","#7ec8ef","#f2d64b","#f0a9a9","#6b6f76","#4f8fd4","#8a9a3c",
-  "#9cc4e8","#2a2a2e","#86d49a","#d98a4b","#cc2b8f","#2f9e52","#e0691c",
-  "#5a5acd","#d94b4b","#4bbfd9","#a0a0a8"
+  // Purple / violet
+  "#d7c8f2","#b9a4e8","#8a6fd4","#5a3fb0",
+  // Blue
+  "#bcdcf6","#7ec8ef","#4f8fd4","#2563a8",
+  // Teal / cyan
+  "#b4ebee","#6fd3da","#2fa9b5","#157f89",
+  // Green
+  "#bfe6c6","#86d49a","#3fb05f","#237a3d",
+  // Olive / lime
+  "#dfe3a8","#c3cf5e","#8a9a3c","#5f6b24",
+  // Yellow / gold
+  "#f7e79a","#f2d64b","#e0b020","#b5860a",
+  // Orange
+  "#f7c9a0","#f0a35a","#e0691c","#b24e0e",
+  // Red / coral
+  "#f3b8b8","#e87c7c","#d94b4b","#a82e2e",
+  // Pink / magenta
+  "#f4b8d8","#e87cb4","#cc2b8f","#99236a",
+  // Brown / earth
+  "#dcc3a8","#c39a6e","#9a6b3c","#6e4a28",
+  // Grey / neutral
+  "#d6d8dc","#a0a4ac","#6b6f76","#3a3a3f","#2a2a2e"
 ];
 function openAddCommodity(idx){
   EDIT._addIdx = idx;
