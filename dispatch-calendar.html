@@ -232,6 +232,18 @@
      stand out loudly at a glance, without changing the commodity fill colour. */
   .ev.tbc{border:4px dotted #e01010;padding:0 4px}
   .ev.tbc.clash{border:4px dotted #e01010}  /* keep the red dots even when double-booked */
+  /* big faded "TBC" watermark filling the empty right-hand space of the block,
+     behind the text (like a draft stamp). Scales with block height. */
+  .ev.tbc .tbc-wm{
+    position:absolute;right:26px;top:50%;transform:translateY(-50%);
+    font-weight:900;font-size:34px;letter-spacing:3px;
+    color:rgba(224,16,16,.16);pointer-events:none;z-index:0;
+    line-height:1;font-family:"Inter",system-ui,sans-serif;user-select:none;
+  }
+  /* keep the real text above the watermark */
+  .ev.tbc .title,.ev.tbc .sub,.ev.tbc .tm,.ev.tbc .ev-tagline{position:relative;z-index:1}
+  /* on a short/compact block there's no room — hide the watermark */
+  .ev.tbc.compact .tbc-wm,.ev.tbc.snug .tbc-wm{display:none}
   /* a clashing block pops to FULL grid-half width on hover/tap so you can read
      it, then settles back — the quick way to read a double-booking */
   .ev[data-stack="1"]:hover, .ev[data-stack="1"].peek{
@@ -599,7 +611,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.6</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.7</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1847,6 +1859,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
     ${transBadge}
     ${flag}
     ${cancelled?`<span class="cxtag">CANCELLED</span>`:driverBadge}
+    ${tbc?`<span class="tbc-wm">TBC</span>`:""}
     <div class="title">${esc(line1)}${tagInline}</div>
     ${tagRow}
     <div class="sub">${esc(commGrade)}${snug?`<span class="sub-tm">${esc(timeRange)}</span>`:""}</div>
