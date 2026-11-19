@@ -244,18 +244,6 @@
   .ev.tbc .title,.ev.tbc .sub,.ev.tbc .tm,.ev.tbc .ev-tagline{position:relative;z-index:1}
   /* on a short/compact block there's no room — hide the watermark */
   .ev.tbc.compact .tbc-wm,.ev.tbc.snug .tbc-wm{display:none}
-  /* JUST-CONFIRMED FLASH: temporary GREEN dotted border + "CONFIRMED" watermark
-     for ~2 min after a load leaves TBC, so every screen sees the status changed. */
-  .ev.justconf{border:4px dotted #1aa84a;padding:0 4px}
-  .ev.justconf.clash{border:4px dotted #1aa84a}
-  .ev.justconf .conf-wm{
-    position:absolute;right:16px;top:50%;transform:translateY(-50%);
-    font-weight:900;font-size:26px;letter-spacing:2px;
-    color:rgba(26,168,74,.30);pointer-events:none;z-index:0;
-    line-height:1;font-family:"Inter",system-ui,sans-serif;user-select:none;white-space:nowrap;
-  }
-  .ev.justconf .title,.ev.justconf .sub,.ev.justconf .tm,.ev.justconf .ev-tagline{position:relative;z-index:1}
-  .ev.justconf.compact .conf-wm,.ev.justconf.snug .conf-wm{display:none}
   /* a clashing block pops to FULL grid-half width on hover/tap so you can read
      it, then settles back — the quick way to read a double-booking */
   .ev[data-stack="1"]:hover, .ev[data-stack="1"].peek{
@@ -624,7 +612,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.2</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.3</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1370,7 +1358,6 @@ async function loadAll(){
   STATE.jobs=applyRecentMoves(all.filter(Boolean));   // don't let a stale reread revert a just-moved booking
   STATE.loadedOnce=true;
   backfillNgrs();      // auto-fill blank NGRs from the grower directory + write back
-  scheduleConfFlashSweep();   // keep any in-window "CONFIRMED" flash (incl. from other screens) ticking
   buildTransporterFilter();
   render();
   const now=new Date();
@@ -1442,7 +1429,6 @@ function normalise(r, sheet){
     grid:grid,                                    // blank/anything else → Grid 1
     grade:r.grade||"",
     apptStatus:r.apptStatus||"",
-    confirmedAt:r.confirmedAt||"",   // leaving-TBC flash timestamp (shows green ~2 min on every screen)
     isBusy:busy,
     duration: durFrom(r.duration),                // minutes; default 45
     tipDate:td, tipMin:(tmin==null?null:tmin),
@@ -1817,15 +1803,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const cancelled = /^cancel/i.test(j.apptStatus||"");
   const confirmed = /^conf/i.test(j.apptStatus||"") || j.arrived;
   const tbc = /^tbc/i.test(j.apptStatus||"");   // to-be-confirmed → dotted commodity-colour border
-  // JUST-CONFIRMED FLASH — only when confirmedAt is a VALID recent timestamp (not
-  // in the future), AND the status really is non-TBC. Hardened so stray/blank/old
-  // values can never light up blocks. Temporarily OFF via FLASH_ON while we verify.
-  let justConf=false;
-  if(FLASH_ON && j.confirmedAt && !tbc){
-    const t=+new Date(j.confirmedAt);
-    if(!isNaN(t)){ const age=Date.now()-t; if(age>=0 && age<JUST_CONFIRMED_MS) justConf=true; }
-  }
-  const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "") + (tbc ? " tbc" : "") + (justConf ? " justconf" : "");
+  const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "") + (tbc ? " tbc" : "");
   const dark = isDarkColor(cvar) ? " darktext" : "";
   // Line 1 = Release/Farm #; Line 2 = Commodity — Grade; Line 3 = time (driver only in the badge)
   const line1 = j.release || j.site || "—";
@@ -1885,7 +1863,6 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
     ${flag}
     ${cancelled?`<span class="cxtag">CANCELLED</span>`:driverBadge}
     ${tbc?`<span class="tbc-wm">TBC</span>`:""}
-    ${justConf?`<span class="conf-wm">CONFIRMED</span>`:""}
     <div class="title">${esc(line1)}${tagInline}</div>
     ${tagRow}
     <div class="sub">${esc(commGrade)}${snug?`<span class="sub-tm">${esc(timeRange)}</span>`:""}</div>
@@ -2257,19 +2234,6 @@ function daysBetweenKeys(a,b){ return Math.round((dateFromKey(b)-dateFromKey(a))
 function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
 let PENDING_WRITES=0;   // in-flight sheet writes; auto-refresh waits for these
-const JUST_CONFIRMED_MS=600000;   // how long the green "CONFIRMED" flash shows after leaving TBC (10 min)
-const FLASH_ON=false;             // master switch for the green just-confirmed flash (off while diagnosing)
-// while any block is inside its flash window, tick a re-render so it clears on time
-let _confFlashTimer=null;
-function scheduleConfFlashSweep(){
-  if(_confFlashTimer) return;
-  _confFlashTimer=setInterval(()=>{
-    const now=Date.now();
-    const anyActive=(STATE.jobs||[]).some(j=>j.confirmedAt && (now-(+new Date(j.confirmedAt))<JUST_CONFIRMED_MS));
-    render();
-    if(!anyActive){ clearInterval(_confFlashTimer); _confFlashTimer=null; }
-  }, 15000);   // re-check every 15s — cheap, and the flash is only ~2 min
-}
 
 /* ---- recently-moved guard --------------------------------------------------
    After a move/group-move SAVES, the sheet can take a couple of seconds to
@@ -3023,11 +2987,6 @@ function saveAppt(){
     if(sv.id){
       const j=STATE.jobs.find(x=>x.id===sv.id);
       if(j){
-             // leaving TBC → stamp the moment so every screen shows the green
-             // "CONFIRMED" flash for a couple of minutes (JUST_CONFIRMED_MS).
-             const wasTBC=/^tbc/i.test(j.apptStatus||"");
-             const nowTBC=/^tbc/i.test(sv.apptStatus||"");
-             if(wasTBC && !nowTBC){ sv._confirmedAt=Date.now(); j.confirmedAt=sv._confirmedAt; }
              j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.ngr=ngr; j.maps=maps; j.driver=driver; j.note=note; j.notes=notes; j.tag=tag;
              j.tipDate=tipDate; j.tipMin=tmin; j.grid=+sv.grid;
              j.duration=+sv.duration; j.commodity=sv.commodity; j.grade=sv.grade; j.apptStatus=sv.apptStatus; }
@@ -3041,7 +3000,6 @@ function saveAppt(){
   });
   closeEditor();
   render();
-  scheduleConfFlashSweep();   // if a load just left TBC, keep the green flash ticking until it clears
   toast("Saving…");
 
   // ---- background writes, all in PARALLEL ----
@@ -3053,7 +3011,6 @@ function saveAppt(){
     const fields={ site, release, contact, phone, ngr, maps, driver, notes, tag, tipDate:dateISO, tipTime:sv.time, grid:String(sv.grid),
       duration:String(sv.duration), commodity:sv.commodity, grade:sv.grade, apptStatus:sv.apptStatus,
       transporter:sheetKey };   // tag the booking type (for shared "Other" sheet)
-    if(sv._confirmedAt){ fields.confirmedAt=new Date(sv._confirmedAt).toISOString(); }  // leaving-TBC flash stamp
     if(sv.id){ jobs.push(postAction(url,{action:"update",id:sv.id,fields})); }
     else{ jobs.push(postAction(url,{action:"create",fields}).then(r=>{
             // swap the temp id for the real one the sheet assigned
