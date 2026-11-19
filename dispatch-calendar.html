@@ -1817,9 +1817,14 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const cancelled = /^cancel/i.test(j.apptStatus||"");
   const confirmed = /^conf/i.test(j.apptStatus||"") || j.arrived;
   const tbc = /^tbc/i.test(j.apptStatus||"");   // to-be-confirmed → dotted commodity-colour border
-  // JUST-CONFIRMED FLASH: for ~2 min after a load leaves TBC, show a temporary
-  // green dotted border + "CONFIRMED" watermark so every screen notices the change.
-  const justConf = j.confirmedAt && !tbc && (Date.now()-(+new Date(j.confirmedAt)) < JUST_CONFIRMED_MS);
+  // JUST-CONFIRMED FLASH — only when confirmedAt is a VALID recent timestamp (not
+  // in the future), AND the status really is non-TBC. Hardened so stray/blank/old
+  // values can never light up blocks. Temporarily OFF via FLASH_ON while we verify.
+  let justConf=false;
+  if(FLASH_ON && j.confirmedAt && !tbc){
+    const t=+new Date(j.confirmedAt);
+    if(!isNaN(t)){ const age=Date.now()-t; if(age>=0 && age<JUST_CONFIRMED_MS) justConf=true; }
+  }
   const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "") + (tbc ? " tbc" : "") + (justConf ? " justconf" : "");
   const dark = isDarkColor(cvar) ? " darktext" : "";
   // Line 1 = Release/Farm #; Line 2 = Commodity — Grade; Line 3 = time (driver only in the badge)
