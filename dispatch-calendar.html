@@ -136,6 +136,18 @@
     display:flex;align-items:center;justify-content:center;font-family:inherit;
   }
   .refresh-btn:hover{background:#f0f0f3}
+  /* floating UNDO — fixed above the content, centred, big and tappable. Appears
+     whenever an undo is available (esp. useful on phones after an accidental drag). */
+  .undo-fab{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+    z-index:250;display:flex;align-items:center;gap:8px;
+    padding:11px 20px;border:none;border-radius:999px;
+    background:#1e1e20;color:#fff;font-size:15px;font-weight:700;
+    box-shadow:0 6px 20px rgba(0,0,0,.28);cursor:pointer;
+    animation:undoPop .18s ease-out}
+  .undo-fab:hover{background:#000}
+  .undo-fab:active{transform:translateX(-50%) scale(.96)}
+  .undo-fab .undo-fab-ic{font-size:19px;line-height:1}
+  @keyframes undoPop{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
   .refresh-btn.spinning{animation:spin .8s linear infinite;color:var(--accent)}
 
   /* ---- Calendar scroll area ---- */
@@ -612,7 +624,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.3</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.4</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -649,6 +661,12 @@
       <span class="synced"><span class="status-dot" id="statusDot"></span><span id="syncedText">Loading…</span></span>
     </div>
   </div>
+
+  <!-- floating UNDO (big & thumb-reachable, esp. on phones) — shows after a move/
+       change, auto-hides after a bit. The toolbar ↶ stays as the desktop control. -->
+  <button id="undoFab" class="undo-fab" style="display:none" onclick="doUndo()">
+    <span class="undo-fab-ic">↶</span><span class="undo-fab-tx">Undo</span>
+  </button>
 
   <!-- scrolling announcement ticker (hidden when empty) -->
   <div class="ticker" id="ticker" style="display:none" title="Click to edit the announcement">
@@ -1043,10 +1061,27 @@ function captureUndo(label, jobs, opts){
          deletedSnaps:(opts.deletedSnaps||[]).map(jobSnap) };
   updateUndoBtn();
 }
+let _undoFabTimer=null;
 function updateUndoBtn(){
-  const b=document.getElementById("undoBtn"); if(!b) return;
-  if(UNDO){ b.style.display=""; b.title="Undo: "+UNDO.label+"  (Ctrl+Z)"; }
-  else b.style.display="none";
+  const b=document.getElementById("undoBtn");
+  if(b){
+    if(UNDO){ b.style.display=""; b.title="Undo: "+UNDO.label+"  (Ctrl+Z)"; }
+    else b.style.display="none";
+  }
+  // floating undo: pops up near the user's hands, auto-hides after a while.
+  // The toolbar ↶ stays available until the undo is actually used or replaced.
+  const fab=document.getElementById("undoFab");
+  if(fab){
+    if(_undoFabTimer){ clearTimeout(_undoFabTimer); _undoFabTimer=null; }
+    if(UNDO){
+      const tx=fab.querySelector(".undo-fab-tx");
+      if(tx) tx.textContent = "Undo";   // keep it short & one line; full action is in the toolbar ↶ tooltip
+      fab.style.display="flex";
+      _undoFabTimer=setTimeout(()=>{ fab.style.display="none"; }, 15000);  // auto-hide after 15s
+    }else{
+      fab.style.display="none";
+    }
+  }
 }
 async function doUndo(){
   if(!UNDO){ toast("Nothing to undo"); return; }
