@@ -244,6 +244,18 @@
   .ev.tbc .title,.ev.tbc .sub,.ev.tbc .tm,.ev.tbc .ev-tagline{position:relative;z-index:1}
   /* on a short/compact block there's no room — hide the watermark */
   .ev.tbc.compact .tbc-wm,.ev.tbc.snug .tbc-wm{display:none}
+  /* JUST-CONFIRMED FLASH: temporary GREEN dotted border + "CONFIRMED" watermark
+     for ~2 min after a load leaves TBC, so every screen sees the status changed. */
+  .ev.justconf{border:4px dotted #1aa84a;padding:0 4px}
+  .ev.justconf.clash{border:4px dotted #1aa84a}
+  .ev.justconf .conf-wm{
+    position:absolute;right:16px;top:50%;transform:translateY(-50%);
+    font-weight:900;font-size:26px;letter-spacing:2px;
+    color:rgba(26,168,74,.30);pointer-events:none;z-index:0;
+    line-height:1;font-family:"Inter",system-ui,sans-serif;user-select:none;white-space:nowrap;
+  }
+  .ev.justconf .title,.ev.justconf .sub,.ev.justconf .tm,.ev.justconf .ev-tagline{position:relative;z-index:1}
+  .ev.justconf.compact .conf-wm,.ev.justconf.snug .conf-wm{display:none}
   /* a clashing block pops to FULL grid-half width on hover/tap so you can read
      it, then settles back — the quick way to read a double-booking */
   .ev[data-stack="1"]:hover, .ev[data-stack="1"].peek{
@@ -492,13 +504,14 @@
   .cal.both-grids .ev .tm{font-size:8px}
   .cal.both-grids .ev.snug .title{font-size:9.5px}
   .cal.both-grids .ev.snug .sub{font-size:8px}
-  /* transporter ribbon: full name by default; single letter in both-grids view */
+  /* transporter ribbon: full name by default; 2-letter code in both-grids view
+     (so e.g. M&K=MK and Marleys=MA don't both read as "M") */
   .ev-trans .trans-mini{display:none}
   .cal.both-grids .ev-trans .trans-full{display:none}
-  .cal.both-grids .ev-trans .trans-mini{display:inline}
-  .cal.both-grids .ev-trans{padding:1px 4px}
+  .cal.both-grids .ev-trans .trans-mini{display:inline;letter-spacing:.5px}
+  .cal.both-grids .ev-trans{padding:1px 5px}
   /* with the ribbon now tiny, the name can run almost to the edge */
-  .cal.both-grids .ev .title{padding-right:20px}
+  .cal.both-grids .ev .title{padding-right:26px}
   /* bolder day dividers ONLY in both-grids view (days are busier there) */
   .cal.both-grids .daycol{border-left-width:2px;border-left-color:#8d93a0}
   .cal.both-grids .daycol:last-child{border-right-width:2px;border-right-color:#8d93a0}
@@ -611,7 +624,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v5.9</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.1</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -692,16 +705,18 @@
 */
 const OTHER_URL = "https://script.google.com/macros/s/AKfycbz_JyXw5sNAVoIKTwx_h7zZvioBdD0L6En3HwI48oWJUChcRTzeu1YcBvDT1OC5Vghv/exec";   // one catch-all sheet for the rest (Own, Delivered, country sites)
 const SHEETS = [
-  { key:"MK",       name:"M&K Bulk Transport",     short:"M&K",   color:"#2563c9", url:"https://script.google.com/macros/s/AKfycbwQ7KknnYntj7oz859R2u_HueNXXyc8-W0o3LOBqNjGPlUxl_vQiny78NqJmaYMD-nvJA/exec" },
-  { key:"MARLEYS",  name:"Marleys",                short:"MARLEYS",color:"#cc2b2b", url:"https://script.google.com/macros/s/AKfycbxtXOiEZhnUlESG2Ck1Anln_2ZJpv1bYCKQeFQb2lTfAMyAaW_Tnyux_oce3jsMXP0/exec" },
-  { key:"SIDHU",    name:"Sidhu Trucklines",       short:"SIDHU", color:"#0d9488", url:"https://script.google.com/macros/s/AKfycbyZ5iLPj1eQ1L-aMCFvjTuf-L78br6tXLFz7mLMUX_a1NtfmsjZtzK82OX0DSIfslcK/exec" },
-  { key:"OWN",      name:"Growers own / Delivered", short:"OWN",  color:"#6a5acd", url:OTHER_URL },
-  { key:"PINGELLY", name:"Pingelly (country site)", short:"PING", color:"#c2873b", url:OTHER_URL },
-  { key:"WAGIN",    name:"Wagin (country site)",    short:"WAGIN",color:"#b5523f", url:OTHER_URL },
-  { key:"WILLIAMS", name:"Williams (country site)", short:"WILL", color:"#7a8b2e", url:OTHER_URL },
-  // add future transporters here: { key:"GENY", name:"GEN Y", short:"GENY", color:"#b4529e", url:"..." },
+  // `mini` = 2-letter code shown on the ribbon in both-grids view (so M&K vs Marleys
+  // don't both read as "M"). Keep each mini unique.
+  { key:"MK",       name:"M&K Bulk Transport",     short:"M&K",   mini:"MK", color:"#2563c9", url:"https://script.google.com/macros/s/AKfycbwQ7KknnYntj7oz859R2u_HueNXXyc8-W0o3LOBqNjGPlUxl_vQiny78NqJmaYMD-nvJA/exec" },
+  { key:"MARLEYS",  name:"Marleys",                short:"MARLEYS",mini:"MA", color:"#cc2b2b", url:"https://script.google.com/macros/s/AKfycbxtXOiEZhnUlESG2Ck1Anln_2ZJpv1bYCKQeFQb2lTfAMyAaW_Tnyux_oce3jsMXP0/exec" },
+  { key:"SIDHU",    name:"Sidhu Trucklines",       short:"SIDHU", mini:"SI", color:"#0d9488", url:"https://script.google.com/macros/s/AKfycbyZ5iLPj1eQ1L-aMCFvjTuf-L78br6tXLFz7mLMUX_a1NtfmsjZtzK82OX0DSIfslcK/exec" },
+  { key:"OWN",      name:"Growers own / Delivered", short:"OWN",  mini:"OW", color:"#6a5acd", url:OTHER_URL },
+  { key:"PINGELLY", name:"Pingelly (country site)", short:"PING", mini:"PI", color:"#c2873b", url:OTHER_URL },
+  { key:"WAGIN",    name:"Wagin (country site)",    short:"WAGIN",mini:"WG", color:"#b5523f", url:OTHER_URL },
+  { key:"WILLIAMS", name:"Williams (country site)", short:"WILL", mini:"WI", color:"#7a8b2e", url:OTHER_URL },
+  // add future transporters here: { key:"GENY", name:"GEN Y", short:"GENY", mini:"GY", color:"#b4529e", url:"..." },
 ];
-function sheetMeta(key){ return SHEETS.find(s=>s.key===key) || {short:key, color:"#9aa0a6", name:key}; }
+function sheetMeta(key){ return SHEETS.find(s=>s.key===key) || {short:key, mini:String(key).slice(0,2).toUpperCase(), color:"#9aa0a6", name:key}; }
 
 /* commodity → colour var. Matched loosely (lowercase contains). */
 const COMMODITY_COLORS = [
@@ -1355,6 +1370,7 @@ async function loadAll(){
   STATE.jobs=applyRecentMoves(all.filter(Boolean));   // don't let a stale reread revert a just-moved booking
   STATE.loadedOnce=true;
   backfillNgrs();      // auto-fill blank NGRs from the grower directory + write back
+  scheduleConfFlashSweep();   // keep any in-window "CONFIRMED" flash (incl. from other screens) ticking
   buildTransporterFilter();
   render();
   const now=new Date();
@@ -1426,6 +1442,7 @@ function normalise(r, sheet){
     grid:grid,                                    // blank/anything else → Grid 1
     grade:r.grade||"",
     apptStatus:r.apptStatus||"",
+    confirmedAt:r.confirmedAt||"",   // leaving-TBC flash timestamp (shows green ~2 min on every screen)
     isBusy:busy,
     duration: durFrom(r.duration),                // minutes; default 45
     tipDate:td, tipMin:(tmin==null?null:tmin),
@@ -1800,7 +1817,10 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const cancelled = /^cancel/i.test(j.apptStatus||"");
   const confirmed = /^conf/i.test(j.apptStatus||"") || j.arrived;
   const tbc = /^tbc/i.test(j.apptStatus||"");   // to-be-confirmed → dotted commodity-colour border
-  const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "") + (tbc ? " tbc" : "");
+  // JUST-CONFIRMED FLASH: for ~2 min after a load leaves TBC, show a temporary
+  // green dotted border + "CONFIRMED" watermark so every screen notices the change.
+  const justConf = j.confirmedAt && !tbc && (Date.now()-(+new Date(j.confirmedAt)) < JUST_CONFIRMED_MS);
+  const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "") + (tbc ? " tbc" : "") + (justConf ? " justconf" : "");
   const dark = isDarkColor(cvar) ? " darktext" : "";
   // Line 1 = Release/Farm #; Line 2 = Commodity — Grade; Line 3 = time (driver only in the badge)
   const line1 = j.release || j.site || "—";
@@ -1836,7 +1856,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   // no ribbon for Growers own (OWN) — it's the default, so a tag is just noise.
   // In both-grids view the columns are narrow, so the ribbon shows just the
   // first letter (M for Marleys) to leave more room for the farm name.
-  const transMini = (meta.short||"?").trim().charAt(0).toUpperCase();
+  const transMini = (meta.mini || (meta.short||"?").trim().slice(0,2)).toUpperCase();
   const transBadge = (j.sheetKey==="OWN")
     ? ""
     : `<span class="ev-trans" style="background:${meta.color}" title="${esc(meta.name)}">`+
@@ -1860,6 +1880,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
     ${flag}
     ${cancelled?`<span class="cxtag">CANCELLED</span>`:driverBadge}
     ${tbc?`<span class="tbc-wm">TBC</span>`:""}
+    ${justConf?`<span class="conf-wm">CONFIRMED</span>`:""}
     <div class="title">${esc(line1)}${tagInline}</div>
     ${tagRow}
     <div class="sub">${esc(commGrade)}${snug?`<span class="sub-tm">${esc(timeRange)}</span>`:""}</div>
@@ -2231,6 +2252,18 @@ function daysBetweenKeys(a,b){ return Math.round((dateFromKey(b)-dateFromKey(a))
 function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
 let PENDING_WRITES=0;   // in-flight sheet writes; auto-refresh waits for these
+const JUST_CONFIRMED_MS=600000;   // how long the green "CONFIRMED" flash shows after leaving TBC (10 min)
+// while any block is inside its flash window, tick a re-render so it clears on time
+let _confFlashTimer=null;
+function scheduleConfFlashSweep(){
+  if(_confFlashTimer) return;
+  _confFlashTimer=setInterval(()=>{
+    const now=Date.now();
+    const anyActive=(STATE.jobs||[]).some(j=>j.confirmedAt && (now-(+new Date(j.confirmedAt))<JUST_CONFIRMED_MS));
+    render();
+    if(!anyActive){ clearInterval(_confFlashTimer); _confFlashTimer=null; }
+  }, 15000);   // re-check every 15s — cheap, and the flash is only ~2 min
+}
 
 /* ---- recently-moved guard --------------------------------------------------
    After a move/group-move SAVES, the sheet can take a couple of seconds to
@@ -2983,7 +3016,13 @@ function saveAppt(){
     const tmin=parseTimeMin(sv.time);
     if(sv.id){
       const j=STATE.jobs.find(x=>x.id===sv.id);
-      if(j){ j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.ngr=ngr; j.maps=maps; j.driver=driver; j.note=note; j.notes=notes; j.tag=tag;
+      if(j){
+             // leaving TBC → stamp the moment so every screen shows the green
+             // "CONFIRMED" flash for a couple of minutes (JUST_CONFIRMED_MS).
+             const wasTBC=/^tbc/i.test(j.apptStatus||"");
+             const nowTBC=/^tbc/i.test(sv.apptStatus||"");
+             if(wasTBC && !nowTBC){ sv._confirmedAt=Date.now(); j.confirmedAt=sv._confirmedAt; }
+             j.site=site; j.release=release; j.contact=contact; j.phone=phone; j.ngr=ngr; j.maps=maps; j.driver=driver; j.note=note; j.notes=notes; j.tag=tag;
              j.tipDate=tipDate; j.tipMin=tmin; j.grid=+sv.grid;
              j.duration=+sv.duration; j.commodity=sv.commodity; j.grade=sv.grade; j.apptStatus=sv.apptStatus; }
     }else{
@@ -2996,6 +3035,7 @@ function saveAppt(){
   });
   closeEditor();
   render();
+  scheduleConfFlashSweep();   // if a load just left TBC, keep the green flash ticking until it clears
   toast("Saving…");
 
   // ---- background writes, all in PARALLEL ----
@@ -3007,6 +3047,7 @@ function saveAppt(){
     const fields={ site, release, contact, phone, ngr, maps, driver, notes, tag, tipDate:dateISO, tipTime:sv.time, grid:String(sv.grid),
       duration:String(sv.duration), commodity:sv.commodity, grade:sv.grade, apptStatus:sv.apptStatus,
       transporter:sheetKey };   // tag the booking type (for shared "Other" sheet)
+    if(sv._confirmedAt){ fields.confirmedAt=new Date(sv._confirmedAt).toISOString(); }  // leaving-TBC flash stamp
     if(sv.id){ jobs.push(postAction(url,{action:"update",id:sv.id,fields})); }
     else{ jobs.push(postAction(url,{action:"create",fields}).then(r=>{
             // swap the temp id for the real one the sheet assigned
