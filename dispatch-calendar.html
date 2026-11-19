@@ -624,7 +624,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.1</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.2</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -2258,6 +2258,7 @@ function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(
 
 let PENDING_WRITES=0;   // in-flight sheet writes; auto-refresh waits for these
 const JUST_CONFIRMED_MS=600000;   // how long the green "CONFIRMED" flash shows after leaving TBC (10 min)
+const FLASH_ON=false;             // master switch for the green just-confirmed flash (off while diagnosing)
 // while any block is inside its flash window, tick a re-render so it clears on time
 let _confFlashTimer=null;
 function scheduleConfFlashSweep(){
