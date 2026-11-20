@@ -306,6 +306,18 @@
     max-width:80%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     box-shadow:-1px 1px 2px rgba(0,0,0,.2);
   }
+  /* Tipped tick — green check on a confirmed-style block (load has tipped).
+     Sits under the transporter ribbon on the right so it doesn't clash. */
+  .tip-tick{
+    position:absolute;top:16px;right:3px;z-index:4;
+    width:16px;height:16px;border-radius:50%;
+    background:#1aa84a;color:#fff;
+    font-size:11px;font-weight:900;line-height:16px;text-align:center;
+    box-shadow:0 1px 2px rgba(0,0,0,.25);
+  }
+  /* if there's no ribbon (shouldn't happen) the tick still sits neatly top-right */
+  .ev:not(:has(.ev-trans)) .tip-tick{top:3px}
+  .ev.compact .tip-tick,.ev.snug .tip-tick{width:13px;height:13px;font-size:9px;line-height:13px;top:14px}
   /* driver badge — bottom-right corner */
   .ev-driver{
     position:absolute;bottom:1px;right:2px;z-index:2;
@@ -624,7 +636,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.4</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.5</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1836,9 +1848,10 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const cvar=commodityVar(j.commodity, j.grade);
   // solid when Confirmed, striped (scheduled) when pencilled-in/blank
   const cancelled = /^cancel/i.test(j.apptStatus||"");
-  const confirmed = /^conf/i.test(j.apptStatus||"") || j.arrived;
+  const tipped = /^tip/i.test(j.apptStatus||"");   // load has tipped → green tick, treated like confirmed
+  const confirmed = /^conf/i.test(j.apptStatus||"") || tipped || j.arrived;
   const tbc = /^tbc/i.test(j.apptStatus||"");   // to-be-confirmed → dotted commodity-colour border
-  const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "") + (tbc ? " tbc" : "");
+  const cls = (confirmed ? "arrived" : "sched") + (cancelled ? " cancelled" : "") + (tbc ? " tbc" : "") + (tipped ? " tipped" : "");
   const dark = isDarkColor(cvar) ? " darktext" : "";
   // Line 1 = Release/Farm #; Line 2 = Commodity — Grade; Line 3 = time (driver only in the badge)
   const line1 = j.release || j.site || "—";
@@ -1895,6 +1908,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
        title="${esc(line1)}${tag?(' ['+esc(tag)+']'):''} — ${esc(commGrade)} · ${esc(meta.name)}${driver?(' · '+esc(driver)):''}${note?(' · 📝 '+esc(note)):''} · ${timeRange} · Grid ${gridNo}${clash?' · double booking':''}"
        style="top:${top}px;height:${h}px;left:calc(${left}% + 1px);width:calc(${width}% - 2px);z-index:${z};--evc:${cvar};--gb:${gridBase}%;--gs:${gridSpan}%">
     ${transBadge}
+    ${tipped?`<span class="tip-tick" title="Tipped">✓</span>`:""}
     ${flag}
     ${cancelled?`<span class="cxtag">CANCELLED</span>`:driverBadge}
     ${tbc?`<span class="tbc-wm">TBC</span>`:""}
@@ -2686,6 +2700,7 @@ function renderEditor(){
           <button class="${apptStatus==='Pencilled'?'on':''}" onclick="setApptStatus('Pencilled')">Pencilled-in</button>
           <button class="${apptStatus==='Confirmed'?'on':''}" onclick="setApptStatus('Confirmed')">Confirmed</button>
           <button class="${apptStatus==='TBC'?'on':''}" onclick="setApptStatus('TBC')">TBC</button>
+          <button class="${apptStatus==='Tipped'?'on':''}" onclick="setApptStatus('Tipped')">Tipped ✓</button>
         </div>
         <div class="ngr-box${ngrOptionsFor(EDIT).length>1&&!EDIT._ngrCustom?' ngr-has-sel':''}">
           <span class="ngr-lbl">NGR:</span>
