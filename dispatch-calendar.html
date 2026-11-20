@@ -310,14 +310,14 @@
      Sits under the transporter ribbon on the right so it doesn't clash. */
   .tip-tick{
     position:absolute;top:16px;right:3px;z-index:4;
-    width:16px;height:16px;border-radius:50%;
+    width:13px;height:13px;border-radius:50%;
     background:#1aa84a;color:#fff;
-    font-size:11px;font-weight:900;line-height:16px;text-align:center;
+    font-size:9px;font-weight:900;line-height:13px;text-align:center;
     box-shadow:0 1px 2px rgba(0,0,0,.25);
   }
   /* if there's no ribbon (shouldn't happen) the tick still sits neatly top-right */
   .ev:not(:has(.ev-trans)) .tip-tick{top:3px}
-  .ev.compact .tip-tick,.ev.snug .tip-tick{width:13px;height:13px;font-size:9px;line-height:13px;top:14px}
+  .ev.compact .tip-tick,.ev.snug .tip-tick{width:11px;height:11px;font-size:8px;line-height:11px;top:15px}
   /* driver badge — bottom-right corner */
   .ev-driver{
     position:absolute;bottom:1px;right:2px;z-index:2;
@@ -636,7 +636,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.5</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.6</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -2699,8 +2699,8 @@ function renderEditor(){
         <div class="seg">
           <button class="${apptStatus==='Pencilled'?'on':''}" onclick="setApptStatus('Pencilled')">Pencilled-in</button>
           <button class="${apptStatus==='Confirmed'?'on':''}" onclick="setApptStatus('Confirmed')">Confirmed</button>
-          <button class="${apptStatus==='TBC'?'on':''}" onclick="setApptStatus('TBC')">TBC</button>
           <button class="${apptStatus==='Tipped'?'on':''}" onclick="setApptStatus('Tipped')">Tipped ✓</button>
+          <button class="${apptStatus==='TBC'?'on':''}" onclick="setApptStatus('TBC')">TBC</button>
         </div>
         <div class="ngr-box${ngrOptionsFor(EDIT).length>1&&!EDIT._ngrCustom?' ngr-has-sel':''}">
           <span class="ngr-lbl">NGR:</span>
