@@ -636,7 +636,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v6.9</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v7.0</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1892,7 +1892,9 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
     ? ""
     : `<span class="ev-trans" style="background:${meta.color}" title="${esc(meta.name)}">`+
       `<span class="trans-full">${esc(meta.short)}</span><span class="trans-mini">${esc(transMini)}</span></span>`;
-  const driverBadge = driver ? `<span class="ev-driver">${esc(driver)}</span>` : "";
+  // show just the driver NAME on the block; full "name · phone" is in the tooltip/editor
+  const driverShown = driverName(driver) || driver;
+  const driverBadge = driverShown ? `<span class="ev-driver" title="${esc(driver)}">${esc(driverShown)}</span>` : "";
   // The envelope on the board now reflects OUR team note (the "Notes" column),
   // NOT the "Note" column Marleys use for their own load confirmations.
   const note=(j.notes||"").trim();
@@ -2683,10 +2685,16 @@ function renderEditor(){
       </div>
       <div class="m-field">
         <span class="ic">🚛</span>
-        <input class="lineinput" id="editDriver" type="text" value="${esc(EDIT.driver||'')}"
+        <input class="lineinput" id="editDriver" type="text" value="${esc(driverName(EDIT.driver))}"
                list="driverList" autocomplete="off" placeholder="Driver — pick ${esc(curMeta.short)} or type a name"
-               oninput="EDIT.driver=this.value">
+               oninput="onDriverField()">
         <datalist id="driverList">${driverOptionsHTML}</datalist>
+      </div>
+      <div class="m-field">
+        <span class="ic">📱</span>
+        <input class="lineinput" id="editDriverPhone" type="text" value="${esc(driverPhone(EDIT.driver))}"
+               inputmode="tel" autocomplete="off" placeholder="Driver phone (optional)"
+               oninput="onDriverField()">
       </div>
       ${(!isNew && otherSameGrower>0) ? `
       <label class="apply-all">
@@ -2793,7 +2801,8 @@ function syncEditFields(){
   const ngrSel=document.getElementById("editNgrSel");
   if(ngrSel && ngrSel.value && ngrSel.value!=="__other__") EDIT.ngr=ngrSel.value;
   const driverEl=document.getElementById("editDriver");
-  if(driverEl) EDIT.driver=driverEl.value;
+  const driverPhEl=document.getElementById("editDriverPhone");
+  if(driverEl||driverPhEl) EDIT.driver=joinDriver(driverEl?driverEl.value:"", driverPhEl?driverPhEl.value:"");
   const sheetEl=document.getElementById("editSheet");
   if(sheetEl && sheetEl.tagName==="SELECT"){ const s=sheetByKey(sheetEl.value); if(s){ EDIT.sheetKey=s.key; EDIT.url=s.url; } }
   // per-service live inputs (time field + the selects' current values)
@@ -2959,6 +2968,22 @@ function saveNewCommodity(){
   renderEditor();
 }
 function setApptStatus(s){ syncEditFields(); EDIT.services.forEach(sv=>sv.apptStatus=s); renderEditor(); }
+
+/* Driver name + phone share the ONE existing "driver" field/column (so no sheet
+   change is needed). We store them joined as "Name · 0400000000" and split them
+   apart for the two editor boxes. */
+const DRIVER_SEP=" · ";
+function driverName(d){ d=String(d||""); const i=d.indexOf(DRIVER_SEP); return (i>=0?d.slice(0,i):d).trim(); }
+function driverPhone(d){ d=String(d||""); const i=d.indexOf(DRIVER_SEP); return (i>=0?d.slice(i+DRIVER_SEP.length):"").trim(); }
+function joinDriver(name,phone){
+  name=(name||"").trim(); phone=(phone||"").trim();
+  return phone ? (name?name+DRIVER_SEP+phone:phone) : name;   // phone-only still works
+}
+// keep EDIT.driver in sync as either box is typed in
+function onDriverField(){
+  const n=document.getElementById("editDriver"), p=document.getElementById("editDriverPhone");
+  EDIT.driver=joinDriver(n?n.value:"", p?p.value:"");
+}
 function addService(){
   syncEditFields();
   // new split service copies grid/time from the first, blank commodity
