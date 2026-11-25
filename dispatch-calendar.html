@@ -636,7 +636,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v7.1</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v7.2</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -2285,6 +2285,11 @@ function daysBetweenKeys(a,b){ return Math.round((dateFromKey(b)-dateFromKey(a))
 function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
 let PENDING_WRITES=0;   // in-flight sheet writes; auto-refresh waits for these
+let LAST_WRITE_AT=0;    // when the last write finished — the sheet needs a few
+                        // seconds AFTER a write returns "ok" before the row is
+                        // readable, so auto-refresh also holds off during a short
+                        // cool-down (stops the bulk-booking "blink out & return").
+const WRITE_COOLDOWN_MS=9000;
 
 /* ---- recently-moved guard --------------------------------------------------
    After a move/group-move SAVES, the sheet can take a couple of seconds to
@@ -2350,7 +2355,7 @@ async function writeBack(job, payload){
   try{
     if(await attempt()) return true;
     return await attempt();   // one retry
-  }finally{ PENDING_WRITES=Math.max(0,PENDING_WRITES-1); }
+  }finally{ PENDING_WRITES=Math.max(0,PENDING_WRITES-1); LAST_WRITE_AT=Date.now(); }
 }
 
 /* richer POST that returns the full response (for update/create/delete). */
@@ -2367,7 +2372,7 @@ async function postAction(url, body){
       headers:{"Content-Type":"text/plain;charset=utf-8"}, redirect:"follow", signal:ctrl.signal });
     return await res.json();
   }catch(e){ return { ok:false, error:String(e) }; }
-  finally{ clearTimeout(to); PENDING_WRITES=Math.max(0,PENDING_WRITES-1); }
+  finally{ clearTimeout(to); PENDING_WRITES=Math.max(0,PENDING_WRITES-1); LAST_WRITE_AT=Date.now(); }
 }
 function sheetByKey(key){ return SHEETS.find(s=>s.key===key); }
 
@@ -3462,8 +3467,10 @@ if(isUnlocked()){ bootBoard(); } else { showGate(); }
 // editing (popup open), dragging, or placing a duplicate/move — so a refresh
 // can't yank the UI out from under them.
 function autoRefresh(){
-  const busy = (typeof EDIT!=="undefined" && EDIT) || drag || resize || PLACING
+  const cooling = (Date.now()-LAST_WRITE_AT) < WRITE_COOLDOWN_MS;  // sheet still catching up after a write
+  const busy = (typeof EDIT!=="undefined" && EDIT) || drag || resize || PLACING || groupDrag
     || PENDING_WRITES>0   // don't reload over an in-flight write (it would revert it)
+    || cooling            // ...nor in the few seconds after, before the sheet is readable (bulk-booking blink)
     || document.getElementById("editBackdrop").style.display==="flex";
   if(!busy) loadAll();
 }
