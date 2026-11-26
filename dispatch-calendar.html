@@ -636,7 +636,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v7.5</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v7.6</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -797,7 +797,7 @@ function saveCustomColor(name, hex){
 function loadTons(j){
   const c=(j.commodity||"").toLowerCase();
   if(/oat/.test(c)) return 55;
-  if(/canola/.test(c)) return 60;
+  if(/canola/.test(c)) return 57;
   return 63;
 }
 function fmtT(n){ return Math.round(n).toLocaleString("en-AU")+"t"; }
