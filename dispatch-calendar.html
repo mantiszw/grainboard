@@ -279,9 +279,11 @@
   .ev.darktext .ev-tag{background:rgba(255,255,255,.26)}
   .ev.clash .ev-tag{font-size:8px;margin-left:3px;padding:0 3px}
   /* longer tag on its own line — shows in full, wraps if needed */
-  .ev-tagline{display:inline-block;margin-top:2px;padding:1px 6px;border-radius:7px;
+  .ev-tagline{display:inline-block;align-self:flex-start;   /* hug the text, don't stretch full-width */
+    margin-top:2px;padding:1px 6px;border-radius:7px;
     font-size:9.5px;font-weight:700;letter-spacing:-.01em;line-height:1.3;
-    background:rgba(0,0,0,.14);color:inherit;white-space:normal;max-width:100%}
+    background:rgba(0,0,0,.14);color:inherit;white-space:normal;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis}
   .ev.darktext .ev-tagline{background:rgba(255,255,255,.26)}
   .ev.clash .ev-tagline{font-size:8px;padding:1px 4px}
   .ev-tagline-sm{white-space:nowrap}   /* short tags like "30t" stay a tidy little pill */
@@ -324,11 +326,11 @@
     position:absolute;bottom:1px;right:2px;z-index:2;
     font-size:7px;font-weight:800;letter-spacing:0.01em;line-height:1.2;
     padding:0px 3px;border-radius:3px;
-    background:rgba(0,0,0,.5);color:#fff;              /* darker so white reads on pale blocks */
-    text-shadow:0 1px 1px rgba(0,0,0,.4);
+    background:rgba(0,0,0,.4);color:#fff;              /* dark enough for white, not heavy */
+    text-shadow:0 1px 1px rgba(0,0,0,.35);
     max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
-  .ev.darktext .ev-driver{background:rgba(0,0,0,.5)}   /* keep it dark even on dark-text blocks */
+  .ev.darktext .ev-driver{background:rgba(0,0,0,.4)}   /* keep it dark even on dark-text blocks */
   /* truck sits to the RIGHT of the driver name, a touch bigger than the text */
   .ev-driver-truck{font-size:10px;line-height:1;vertical-align:-1px}
   /* on very short blocks, drop the driver so it doesn't collide with the ribbon */
@@ -640,7 +642,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.2</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.3</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
