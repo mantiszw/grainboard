@@ -284,6 +284,7 @@
     background:rgba(0,0,0,.14);color:inherit;white-space:normal;max-width:100%}
   .ev.darktext .ev-tagline{background:rgba(255,255,255,.26)}
   .ev.clash .ev-tagline{font-size:8px;padding:1px 4px}
+  .ev-tagline-sm{white-space:nowrap}   /* short tags like "30t" stay a tidy little pill */
   .ev .sub{font-weight:500;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
   .ev .tm{font-weight:500;opacity:.7;font-size:9.5px;white-space:nowrap}
   /* clash (narrow, side-by-side) blocks: keep the SAME normal font size as any
@@ -323,10 +324,11 @@
     position:absolute;bottom:1px;right:2px;z-index:2;
     font-size:7px;font-weight:800;letter-spacing:0.01em;line-height:1.2;
     padding:0px 3px;border-radius:3px;
-    background:rgba(0,0,0,.22);color:#fff;
+    background:rgba(0,0,0,.5);color:#fff;              /* darker so white reads on pale blocks */
+    text-shadow:0 1px 1px rgba(0,0,0,.4);
     max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
-  .ev.darktext .ev-driver{background:rgba(255,255,255,.28)}
+  .ev.darktext .ev-driver{background:rgba(0,0,0,.5)}   /* keep it dark even on dark-text blocks */
   /* truck sits to the RIGHT of the driver name, a touch bigger than the text */
   .ev-driver-truck{font-size:10px;line-height:1;vertical-align:-1px}
   /* on very short blocks, drop the driver so it doesn't collide with the ribbon */
@@ -638,7 +640,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v7.9</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.2</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1966,10 +1968,11 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
   const flag = note ? `<span class="ev-flag" title="${esc(note)}">📩</span>` : "";
   // per-booking visible tag (e.g. "25t") — shows as a pill beside the name, this load only
   const tag=(j.tag||"").trim();
-  // short tags sit inline after the name; longer ones get their own line so they
-  // always show in full (e.g. "TBC - WEATHER DEPENDENT") instead of being clipped
-  const tagInline = (tag && tag.length<=8) ? `<span class="ev-tag" title="${esc(tag)}">${esc(tag)}</span>` : "";
-  const tagRow = (tag && tag.length>8) ? `<div class="ev-tagline" title="${esc(tag)}">${esc(tag)}</div>` : "";
+  // The tag gets its OWN line under the name (never inside the truncating title),
+  // so it always shows in full even when the grower name is long and clips (e.g.
+  // "K.M HUMPHREYS & K.W HUMPHREYS"). Short tags sit left; long ones wrap.
+  const tagInline = "";
+  const tagRow = tag ? `<div class="ev-tagline${tag.length<=8?' ev-tagline-sm':''}" title="${esc(tag)}">${esc(tag)}</div>` : "";
   return `<div class="ev ${cls}${compact}${snug}${dark}${clash?' clash':''}" data-id="${j.id}" data-sheet="${j.sheetKey}"
        data-stack="${cols>1?1:0}" data-z="${z}"
        title="${esc(line1)}${tag?(' ['+esc(tag)+']'):''} — ${esc(commGrade)} · ${esc(meta.name)}${driver?(' · '+esc(driver)):''}${note?(' · 📝 '+esc(note)):''} · ${timeRange} · Grid ${gridNo}${clash?' · double booking':''}"
