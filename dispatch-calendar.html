@@ -636,7 +636,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v7.6</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v7.8</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -700,6 +700,8 @@
   <div class="toast" id="toast"></div>
   <!-- grower autocomplete list — built once, not on every editor open -->
   <datalist id="farmList"></datalist>
+  <!-- driver/contact autocomplete list — built once, same pattern as farmList -->
+  <datalist id="driverList"></datalist>
 
   <!-- Edit popup -->
   <div class="modal-backdrop" id="editBackdrop" style="display:none">
@@ -990,6 +992,30 @@ function buildFarmList(){
     const o=document.createElement("option");
     o.value=g.release||g.site||"";
     if(g.site&&g.release) o.label=g.site;
+    frag.appendChild(o);
+  });
+  dl.innerHTML=""; dl.appendChild(frag);
+}
+
+/* driver/contact autocomplete — built once (like buildFarmList), per-transporter
+   sheet drivers + the shared contact directory. Rebuilt only when the set changes. */
+let _driverListSig="";
+function buildDriverList(sheetKey){
+  const dl=document.getElementById("driverList");
+  if(!dl) return;
+  const seen=new Set(), opts=[];
+  driversFor(sheetKey).forEach(d=>{ const k=(d||"").toLowerCase().trim();
+    if(k&&!seen.has(k)){ seen.add(k); opts.push([d,""]); } });
+  allDriverContacts().forEach(c=>{ const k=(c[0]||"").toLowerCase().trim();
+    if(k&&!seen.has(k)){ seen.add(k); opts.push([c[0], c[1]||""]); } });
+  const sig=(sheetKey||"")+":"+opts.length;
+  if(sig===_driverListSig && dl.children.length) return;
+  _driverListSig=sig;
+  const frag=document.createDocumentFragment();
+  opts.forEach(([name,phone])=>{
+    const o=document.createElement("option");
+    o.value=name;
+    if(phone) o.label=phone;    // shows the number beside the name in the picker
     frag.appendChild(o);
   });
   dl.innerHTML=""; dl.appendChild(frag);
@@ -1931,7 +1957,7 @@ function eventHTML(j, gridNo, col, cols, fullWidth){
       `<span class="trans-full">${esc(meta.short)}</span><span class="trans-mini">${esc(transMini)}</span></span>`;
   // show just the driver NAME on the block; full "name · phone" is in the tooltip/editor
   const driverShown = driverName(driver) || driver;
-  const driverBadge = driverShown ? `<span class="ev-driver" title="${esc(driver)}">${esc(driverShown)}</span>` : "";
+  const driverBadge = driverShown ? `<span class="ev-driver" title="${esc(driver)}">🚚 ${esc(driverShown)}</span>` : "";
   // The envelope on the board now reflects OUR team note (the "Notes" column),
   // NOT the "Note" column Marleys use for their own load confirmations.
   const note=(j.notes||"").trim();
@@ -2631,16 +2657,10 @@ function renderEditor(){
   // transporter. Changing it on an existing load MOVES it to that sheet.
   // A colour chip mirrors the block ribbon.
   const curMeta = sheetMeta(EDIT.sheetKey);
-  // driver options = this transporter's sheet drivers + the shared contact
-  // directory (name — phone). Free-typing still allowed. Picking a contact name
-  // auto-fills the phone box (see onDriverField).
-  const _seenDrv=new Set();
-  const _sheetDrivers=driversFor(EDIT.sheetKey).map(d=>{ _seenDrv.add((d||"").toLowerCase().trim());
-    return `<option value="${esc(d)}"></option>`; });
-  const _contactDrivers=allDriverContacts()
-    .filter(c=>!_seenDrv.has((c[0]||"").toLowerCase().trim()))
-    .map(c=>`<option value="${esc(c[0])}">${esc(c[1]||"")}</option>`);
-  const driverOptionsHTML = _sheetDrivers.concat(_contactDrivers).join("");
+  // driver/contact autocomplete lives in the static #driverList datalist, built
+  // once (sheet drivers + shared contact directory). Free-typing still allowed;
+  // picking a contact name auto-fills the phone box (see onDriverField).
+  buildDriverList(EDIT.sheetKey);
   const pickerHTML = `
       <div class="m-field">
         <span class="ic">🚚</span>
@@ -2737,7 +2757,6 @@ function renderEditor(){
         <input class="lineinput" id="editDriver" type="text" value="${esc(driverName(EDIT.driver))}"
                list="driverList" autocomplete="off" placeholder="Driver — pick ${esc(curMeta.short)} or type a name"
                oninput="onDriverField()">
-        <datalist id="driverList">${driverOptionsHTML}</datalist>
       </div>
       <div class="m-field">
         <span class="ic">📱</span>
