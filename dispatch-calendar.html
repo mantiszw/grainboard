@@ -454,31 +454,40 @@
     color:var(--ink-dim);gap:12px;text-align:center;padding:30px}
   .spinner{width:28px;height:28px;border:3px solid var(--grid-line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
-  /* 🚚 hidden easter-egg truck — drives across the screen and removes itself */
+  /* 🕺 hidden easter-egg — a dancer moonwalks across the screen and removes itself.
+     He faces LEFT (scaleX -1) but glides RIGHT, with a stepping bob = moonwalk. */
   .truck-drive{
-    position:fixed; left:-120px; bottom:38px; z-index:9999;
-    font-size:64px; line-height:1; pointer-events:none; will-change:transform;
+    position:fixed; left:-120px; bottom:40px; z-index:9999;
+    font-size:66px; line-height:1; pointer-events:none; will-change:transform;
     filter:drop-shadow(0 6px 6px rgba(0,0,0,.25));
-    animation:truck-across 4.6s cubic-bezier(.45,.02,.55,.98) forwards;
+    animation:moonwalk-across 6s cubic-bezier(.33,0,.4,1) forwards,
+              moonwalk-step .55s ease-in-out infinite;
   }
   .truck-dust{
-    position:fixed; left:-150px; bottom:34px; z-index:9998;
-    font-size:30px; line-height:1; pointer-events:none; opacity:.7;
-    animation:truck-across 4.6s cubic-bezier(.45,.02,.55,.98) forwards;
+    position:fixed; left:-150px; bottom:62px; z-index:9998;
+    font-size:26px; line-height:1; pointer-events:none; opacity:.85;
+    animation:moonwalk-across 6s cubic-bezier(.33,0,.4,1) forwards,
+              sparkle-twinkle .5s ease-in-out infinite;
   }
-  @keyframes truck-across{
-    0%  {transform:translateX(0);}
-    6%  {transform:translateX(0) translateY(0);}
-    8%  {transform:translateX(6vw) translateY(-5px);}   /* little bumps */
-    10% {transform:translateX(9vw) translateY(0);}
-    30% {transform:translateX(30vw) translateY(-4px);}
-    32% {transform:translateX(33vw) translateY(0);}
-    60% {transform:translateX(62vw) translateY(-4px);}
-    62% {transform:translateX(65vw) translateY(0);}
-    100%{transform:translateX(118vw) translateY(0);}
+  /* glide across (the dancer is mirrored so he appears to walk backwards) */
+  @keyframes moonwalk-across{
+    0%  {left:-120px;}
+    100%{left:112vw;}
+  }
+  /* the stepping/leaning bob — kept mirrored (scaleX -1) the whole time */
+  @keyframes moonwalk-step{
+    0%  {transform:scaleX(-1) translateY(0)    rotate(-6deg);}
+    25% {transform:scaleX(-1) translateY(-7px) rotate(-2deg);}
+    50% {transform:scaleX(-1) translateY(0)    rotate(-6deg);}
+    75% {transform:scaleX(-1) translateY(-7px) rotate(-10deg);}
+    100%{transform:scaleX(-1) translateY(0)    rotate(-6deg);}
+  }
+  @keyframes sparkle-twinkle{
+    0%,100%{transform:scale(.8);opacity:.5}
+    50%    {transform:scale(1.2);opacity:1}
   }
   @media (prefers-reduced-motion: reduce){
-    .truck-drive,.truck-dust{animation-duration:2.2s}
+    .truck-drive,.truck-dust{animation-duration:3s, .55s}
   }
   .state h2{font-size:15px;color:var(--ink);font-weight:700}
   .state p{font-size:13px;max-width:360px;line-height:1.5}
@@ -705,7 +714,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.9</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v9.0</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1500,17 +1509,19 @@ function honkTruck(){
   }
 }
 
-// the animation itself — a truck emoji drives left→right once.
+// the animation itself — a dancer moonwalks across the screen once.
+// He GLIDES to the right while leaning/stepping as if walking left — the
+// classic moonwalk illusion — then a sparkle trails behind.
 function driveTruck(){
   if(TRUCK_BUSY) return; TRUCK_BUSY=true;
   const el=document.createElement("div");
-  el.className="truck-drive";
-  el.textContent="🚚";
+  el.className="truck-drive moonwalk";
+  el.textContent="🕺";
   el.setAttribute("aria-hidden","true");
   document.body.appendChild(el);
-  // a little dust puff that trails behind
+  // a sparkle that trails behind the glide
   const dust=document.createElement("div");
-  dust.className="truck-dust"; dust.textContent="💨";
+  dust.className="truck-dust"; dust.textContent="✨";
   document.body.appendChild(dust);
   const done=()=>{ el.remove(); dust.remove(); TRUCK_BUSY=false; };
   el.addEventListener("animationend", done, {once:true});
