@@ -679,7 +679,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.5</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.6</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1379,24 +1379,42 @@ async function loadCutoffs(){
   try{
     const res=await fetch(CUTOFF_URL+"?cutoffs=1&_cb="+Date.now(), {redirect:"follow"});
     const data=await res.json();
-    if(data.ok){
-      let obj={};
-      try{ obj=JSON.parse(data.cutoffs||"{}")||{}; }catch(e){ obj={}; }
-      // tolerate the old plain-array format, else {list, excludes}
-      if(Array.isArray(obj)){ CUTOFFS=obj; CUTOFF_EXCLUDES=[]; }
-      else { CUTOFFS=Array.isArray(obj.list)?obj.list:[]; CUTOFF_EXCLUDES=Array.isArray(obj.excludes)?obj.excludes:[]; }
-      render();
-    }
+    // IMPORTANT: only adopt the server's cutoffs when it actually ANSWERED the
+    // cutoffs request. An old Code.gs (no cutoff handler) ignores ?cutoffs=1 and
+    // returns the normal {ok,rows} payload with no `cutoffs` field — in that case
+    // we must KEEP whatever is on this device, not wipe it to empty.
+    if(!data || data.cutoffs===undefined) return;      // server can't sync cutoffs yet
+    let obj={};
+    try{ obj=JSON.parse(data.cutoffs||"{}")||{}; }catch(e){ obj={}; }
+    // tolerate the old plain-array format, else {list, excludes}
+    if(Array.isArray(obj)){ CUTOFFS=obj; CUTOFF_EXCLUDES=[]; }
+    else { CUTOFFS=Array.isArray(obj.list)?obj.list:[]; CUTOFF_EXCLUDES=Array.isArray(obj.excludes)?obj.excludes:[]; }
+    saveLocalCutoffs();                                 // mirror to this device too
+    render();
   }catch(e){ console.warn("[dispatch] cutoffs load fail:", e); }
 }
+// keep a per-device copy so cutoffs survive refreshes/reloads even before the
+// Code.gs sync is deployed (and as a fallback if the server is briefly unreachable)
+function saveLocalCutoffs(){
+  try{ localStorage.setItem("dispatch_cutoffs", JSON.stringify({list:CUTOFFS, excludes:CUTOFF_EXCLUDES})); }catch(e){}
+}
+function loadLocalCutoffs(){
+  try{
+    const raw=localStorage.getItem("dispatch_cutoffs"); if(!raw) return;
+    const obj=JSON.parse(raw)||{};
+    if(Array.isArray(obj.list)) CUTOFFS=obj.list;
+    if(Array.isArray(obj.excludes)) CUTOFF_EXCLUDES=obj.excludes;
+  }catch(e){}
+}
 function saveCutoffs(){
-  render();   // reflect locally at once
+  saveLocalCutoffs();   // always keep a device copy so it survives refresh/reload
+  render();             // reflect locally at once
   const payload=JSON.stringify({list:CUTOFFS, excludes:CUTOFF_EXCLUDES});
-  if(!CUTOFF_URL || CUTOFF_URL.startsWith("PASTE_")){ toast("Cutoffs set (this device — not synced)"); return; }
+  if(!CUTOFF_URL || CUTOFF_URL.startsWith("PASTE_")){ toast("Cutoff set (this device — not shared yet)"); return; }
   postAction(CUTOFF_URL, {action:"savecutoffs", text:payload}).then(r=>{
-    if(r&&r.ok){ toast("Cutoffs updated for everyone"); }
-    else{ toast("Set here, but didn't sync", true); }
-  }).catch(()=>toast("Set here, but didn't sync", true));
+    if(r&&r.ok&&r.cutoffs!==undefined){ toast("Cutoffs updated for everyone"); }
+    else{ toast("Cutoff set here — add the Code.gs on the Other sheet to share it", true); }
+  }).catch(()=>toast("Cutoff set here, but didn't sync", true));
 }
 // how much of a commodity is booked in the window FROM TODAY to the cutoff date
 // (counts real, non-cancelled, non-opted-out loads of that commodity across ALL
@@ -1711,7 +1729,8 @@ async function loadAll(){
   loadDrivers();   // refresh per-transporter driver lists in the background
   loadSharedColors().then(()=>render());   // pull shared colours, then repaint
   loadAnnounce();   // pull the shared scrolling announcement
-  loadCutoffs();    // pull the shared shipment cutoffs
+  loadLocalCutoffs(); // show this device's cutoffs instantly…
+  loadCutoffs();    // …then reconcile with the shared (Other sheet) copy
   const all=[];
   let anyFail=false, lastErr="";
   // fetch each UNIQUE sheet url once (several booking types can share one sheet)
