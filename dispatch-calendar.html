@@ -679,7 +679,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.6</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.7</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1439,16 +1439,21 @@ function cutoffBooked(co){
   return t;
 }
 function cutoffStatus(co){
-  const booked=cutoffBooked(co);
   const target=+co.target||0;
-  const remaining=Math.max(0, target-booked);
-  const diff=booked-target;                 // signed: + over target, − under
-  const pct=target>0 ? Math.min(100, Math.round(booked/target*100)) : 0;
+  // `baseline` = how much was ALREADY booked in-window the moment this cutoff was
+  // created. We only count NEW loads added since then, so the target is "how much
+  // more we still need from now", not reduced by what was already on the board.
+  const baseline=+co.baseline||0;
+  const inWindow=cutoffBooked(co);          // total matching loads today→cutoff
+  const progress=Math.max(0, inWindow-baseline);   // loads added since creation
+  const remaining=Math.max(0, target-progress);
+  const diff=progress-target;               // signed: + over target, − under
+  const pct=target>0 ? Math.min(100, Math.round(progress/target*100)) : 0;
   const end=dateFromKey(co.date);
   const today=new Date(); today.setHours(0,0,0,0);
   const past = end ? (end<today) : false;
-  const met = booked>=target;
-  return { booked, remaining, diff, pct, met, past };
+  const met = progress>=target;
+  return { booked:progress, inWindow, baseline, remaining, diff, pct, met, past };
 }
 // signed over/under figure for a cutoff, e.g. "+12t" (over) or "−55t" (short)
 function cutoffDiffTxt(st){
@@ -1509,8 +1514,12 @@ function addCutoff(){
   if(tRaw===null) return;
   const target=parseFloat(String(tRaw).replace(/[^0-9.]/g,""));
   if(!(target>0)){ toast("Enter a tonnage number", true); return; }
-  CUTOFFS.push({ id:"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
-    commodity:commodity.trim(), date, target });
+  const co={ id:"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    commodity:commodity.trim(), date, target };
+  // baseline: tonnage ALREADY booked in-window right now — we subtract it so the
+  // cutoff starts at the full target and only counts loads added from here on.
+  co.baseline=cutoffBooked(co);
+  CUTOFFS.push(co);
   saveCutoffs();
   toast(`Cutoff added: ${commodity.trim()} ${fmtT(target)} by ${fmtCutDate(date)}`);
 }
@@ -1519,9 +1528,10 @@ function editCutoff(id){
   const st=cutoffStatus(co);
   const choice=prompt(
     `${co.commodity} cutoff — ${fmtCutDate(co.date)}\n`+
-    `Target ${fmtT(co.target)} · booked ${fmtT(st.booked)} · ${st.met?"met ✓":fmtT(st.remaining)+" to go"}\n\n`+
+    `Target ${fmtT(co.target)} · added since ${fmtT(st.booked)} · ${st.met?"met ✓":fmtT(st.remaining)+" to go"}\n\n`+
     `Type a NEW tonnage to change the target,\n`+
     `type DATE to change the date,\n`+
+    `type RESET to recount from now (ignore loads already on the board),\n`+
     `type DELETE to remove this cutoff,\n`+
     `or Cancel to close.`, String(co.target));
   if(choice===null) return;
@@ -1529,12 +1539,20 @@ function editCutoff(id){
   if(/^delete$/i.test(v)){
     CUTOFFS=CUTOFFS.filter(c=>c.id!==id); saveCutoffs(); toast("Cutoff removed"); return;
   }
+  if(/^reset$/i.test(v)){
+    // recount from now: treat everything currently in-window as the baseline, so
+    // only loads added AFTER this reset count toward the target.
+    co.baseline=cutoffBooked(co); saveCutoffs(); toast("Cutoff recounting from now"); return;
+  }
   if(/^date$/i.test(v)){
     const dRaw=prompt("New cutoff date?\n(e.g. 3 Dec, 3/12, 2026-12-03)", co.date);
     if(dRaw===null) return;
     const nd=parseCutoffDate(dRaw);
     if(!nd){ toast("Couldn't read that date", true); return; }
-    co.date=nd; saveCutoffs(); toast("Cutoff date updated"); return;
+    co.date=nd;
+    // the window moved → re-baseline so "added since" stays loads-from-now
+    co.baseline=cutoffBooked(co);
+    saveCutoffs(); toast("Cutoff date updated"); return;
   }
   const nt=parseFloat(v.replace(/[^0-9.]/g,""));
   if(nt>0){ co.target=nt; saveCutoffs(); toast("Cutoff target updated"); }
