@@ -103,8 +103,12 @@
     background:color-mix(in srgb, var(--cc,#999) 15%, #fff)}
   .daycut .dc-dot{width:6px;height:6px;border-radius:50%;background:var(--cc,#999);flex:0 0 auto}
   .daycut .dc-rem{font-weight:800}
+  .daycut .dc-num{font-weight:900;font-size:10.5px}
   .daycut.cut-met{background:#eafaf0;border-color:#1aa84a;color:#1aa84a}
   .daycut.cut-over{background:#fdecec;border-color:#d94b4b;color:#c62828}
+  /* number colour: green when at/over target, red when still short */
+  .daycut.dc-ok .dc-num{color:#1aa84a}
+  .daycut.dc-short .dc-num{color:#c62828}
   /* left zone: brand + grid buttons */
   .left-zone{display:flex;align-items:center;gap:12px}
   /* announcement button */
@@ -675,7 +679,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.4</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.5</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -928,10 +932,15 @@ function dayCutoffHTML(d){
   return hits.map(co=>{
     const st=cutoffStatus(co);
     const col=commodityVar(co.commodity,"");
-    const cls = st.met ? "cut-met" : (st.past ? "cut-over" : "");
-    const rem = st.met ? "✓" : (st.past ? `${fmtT(st.remaining)} short` : `${fmtT(st.remaining)} to go`);
-    return `<div class="daycut ${cls}" style="--cc:${col}" title="${esc(co.commodity)} cutoff">`
-      +`<span class="dc-dot"></span>${esc(co.commodity)} <span class="dc-rem">${rem}</span></div>`;
+    // colour the number: green when at/over target, red when still short
+    const overCls = st.diff>=0 ? "dc-ok" : "dc-short";
+    const cls = (st.met?"cut-met ":"") + (st.past&&!st.met?"cut-over ":"") + overCls;
+    const num = cutoffDiffTxt(st);                       // e.g. "+12t" or "−55t"
+    const word = st.diff>=0 ? "over" : "short";
+    return `<div class="daycut ${cls}" style="--cc:${col}" `
+      +`title="${esc(co.commodity)} cutoff — ${fmtT(st.booked)} of ${fmtT(co.target)} (${num} ${word})">`
+      +`<span class="dc-dot"></span>${esc(co.commodity)} `
+      +`<span class="dc-num">${num}</span></div>`;
   }).join("");
 }
 
@@ -1389,18 +1398,21 @@ function saveCutoffs(){
     else{ toast("Set here, but didn't sync", true); }
   }).catch(()=>toast("Set here, but didn't sync", true));
 }
-// how much of a commodity has been booked on/before a cutoff date (counts real,
-// non-cancelled, non-opted-out loads of that commodity across ALL transporters)
+// how much of a commodity is booked in the window FROM TODAY to the cutoff date
+// (counts real, non-cancelled, non-opted-out loads of that commodity across ALL
+// transporters). Loads before today are already done and don't count toward what's
+// still needed; loads after the cutoff don't count either.
 function cutoffBooked(co){
   const end=dateFromKey(co.date); if(!end) return 0;
   end.setHours(23,59,59,999);
+  const start=new Date(); start.setHours(0,0,0,0);        // today, local midnight
   const cname=(co.commodity||"").toLowerCase().trim();
   let t=0;
   (STATE.jobs||[]).forEach(j=>{
     if(j.isBusy) return;
     if(j.noCutoff || CUTOFF_EXCLUDES.indexOf(j.id)>=0) return;   // opted out (this load)
     if(/^cancel/i.test(j.apptStatus||"")) return;
-    if(!j.tipDate || j.tipDate>end) return;                 // only on/before the cutoff
+    if(!j.tipDate || j.tipDate<start || j.tipDate>end) return;   // only today → cutoff
     const jc=(j.commodity||"").toLowerCase().trim();
     // match the base commodity (so "Barley" matches "Barley", and a graded
     // "Lentils — Nipper" still matches a "Lentils" cutoff)
@@ -1410,13 +1422,21 @@ function cutoffBooked(co){
 }
 function cutoffStatus(co){
   const booked=cutoffBooked(co);
-  const remaining=Math.max(0, (+co.target||0)-booked);
-  const pct=co.target>0 ? Math.min(100, Math.round(booked/co.target*100)) : 0;
+  const target=+co.target||0;
+  const remaining=Math.max(0, target-booked);
+  const diff=booked-target;                 // signed: + over target, − under
+  const pct=target>0 ? Math.min(100, Math.round(booked/target*100)) : 0;
   const end=dateFromKey(co.date);
   const today=new Date(); today.setHours(0,0,0,0);
   const past = end ? (end<today) : false;
-  const met = booked>=(+co.target||0);
-  return { booked, remaining, pct, met, past };
+  const met = booked>=target;
+  return { booked, remaining, diff, pct, met, past };
+}
+// signed over/under figure for a cutoff, e.g. "+12t" (over) or "−55t" (short)
+function cutoffDiffTxt(st){
+  const d=Math.round(st.diff);
+  if(d===0) return "±0t";
+  return (d>0?"+":"−")+fmtT(Math.abs(d));
 }
 // parse a user-typed date like "3 Dec", "3/12", "2026-12-03", "Dec 3"
 // → the numeric YYYYMMDD day-key the rest of the board uses (0 if unreadable).
