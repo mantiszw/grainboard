@@ -679,7 +679,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.7</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.8</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1404,7 +1404,20 @@ function loadLocalCutoffs(){
     const obj=JSON.parse(raw)||{};
     if(Array.isArray(obj.list)) CUTOFFS=obj.list;
     if(Array.isArray(obj.excludes)) CUTOFF_EXCLUDES=obj.excludes;
+    migrateCutoffBaselines();
   }catch(e){}
+}
+// Any cutoff created before the baseline feature has no `baseline` — which would
+// make it count loads already on the board. Stamp it once with the current
+// in-window total so it behaves like a fresh cutoff (only NEW loads count).
+// Runs after cutoffs load, but only once STATE.jobs are available.
+function migrateCutoffBaselines(){
+  if(!STATE || !STATE.jobs || !STATE.jobs.length) return;   // wait until jobs loaded
+  let changed=false;
+  CUTOFFS.forEach(co=>{
+    if(co && co.baseline===undefined){ co.baseline=cutoffBooked(co); changed=true; }
+  });
+  if(changed) saveLocalCutoffs();
 }
 function saveCutoffs(){
   saveLocalCutoffs();   // always keep a device copy so it survives refresh/reload
@@ -1771,6 +1784,7 @@ async function loadAll(){
   STATE.jobs=applyRecentMoves(all.filter(Boolean));   // don't let a stale reread revert a just-moved booking
   STATE.loadedOnce=true;
   backfillNgrs();      // auto-fill blank NGRs from the grower directory + write back
+  migrateCutoffBaselines();   // stamp a baseline on any pre-baseline cutoff, now jobs exist
   buildTransporterFilter();
   render();
   const now=new Date();
