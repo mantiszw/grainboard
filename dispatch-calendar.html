@@ -454,6 +454,32 @@
     color:var(--ink-dim);gap:12px;text-align:center;padding:30px}
   .spinner{width:28px;height:28px;border:3px solid var(--grid-line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* 🚚 hidden easter-egg truck — drives across the screen and removes itself */
+  .truck-drive{
+    position:fixed; left:-120px; bottom:38px; z-index:9999;
+    font-size:64px; line-height:1; pointer-events:none; will-change:transform;
+    filter:drop-shadow(0 6px 6px rgba(0,0,0,.25));
+    animation:truck-across 4.6s cubic-bezier(.45,.02,.55,.98) forwards;
+  }
+  .truck-dust{
+    position:fixed; left:-150px; bottom:34px; z-index:9998;
+    font-size:30px; line-height:1; pointer-events:none; opacity:.7;
+    animation:truck-across 4.6s cubic-bezier(.45,.02,.55,.98) forwards;
+  }
+  @keyframes truck-across{
+    0%  {transform:translateX(0);}
+    6%  {transform:translateX(0) translateY(0);}
+    8%  {transform:translateX(6vw) translateY(-5px);}   /* little bumps */
+    10% {transform:translateX(9vw) translateY(0);}
+    30% {transform:translateX(30vw) translateY(-4px);}
+    32% {transform:translateX(33vw) translateY(0);}
+    60% {transform:translateX(62vw) translateY(-4px);}
+    62% {transform:translateX(65vw) translateY(0);}
+    100%{transform:translateX(118vw) translateY(0);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .truck-drive,.truck-dust{animation-duration:2.2s}
+  }
   .state h2{font-size:15px;color:var(--ink);font-weight:700}
   .state p{font-size:13px;max-width:360px;line-height:1.5}
 
@@ -679,7 +705,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.8</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.9</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -1386,17 +1412,22 @@ async function loadCutoffs(){
     if(!data || data.cutoffs===undefined) return;      // server can't sync cutoffs yet
     let obj={};
     try{ obj=JSON.parse(data.cutoffs||"{}")||{}; }catch(e){ obj={}; }
-    // tolerate the old plain-array format, else {list, excludes}
+    // tolerate the old plain-array format, else {list, excludes, truck}
     if(Array.isArray(obj)){ CUTOFFS=obj; CUTOFF_EXCLUDES=[]; }
-    else { CUTOFFS=Array.isArray(obj.list)?obj.list:[]; CUTOFF_EXCLUDES=Array.isArray(obj.excludes)?obj.excludes:[]; }
+    else {
+      CUTOFFS=Array.isArray(obj.list)?obj.list:[];
+      CUTOFF_EXCLUDES=Array.isArray(obj.excludes)?obj.excludes:[];
+      TRUCK_TS=+obj.truck||0;                           // shared easter-egg trigger
+    }
     saveLocalCutoffs();                                 // mirror to this device too
+    maybeDriveTruck();                                  // play the truck if someone honked
     render();
   }catch(e){ console.warn("[dispatch] cutoffs load fail:", e); }
 }
 // keep a per-device copy so cutoffs survive refreshes/reloads even before the
 // Code.gs sync is deployed (and as a fallback if the server is briefly unreachable)
 function saveLocalCutoffs(){
-  try{ localStorage.setItem("dispatch_cutoffs", JSON.stringify({list:CUTOFFS, excludes:CUTOFF_EXCLUDES})); }catch(e){}
+  try{ localStorage.setItem("dispatch_cutoffs", JSON.stringify({list:CUTOFFS, excludes:CUTOFF_EXCLUDES, truck:TRUCK_TS})); }catch(e){}
 }
 function loadLocalCutoffs(){
   try{
@@ -1419,15 +1450,85 @@ function migrateCutoffBaselines(){
   });
   if(changed) saveLocalCutoffs();
 }
+// one place that builds the shared payload, so cutoffs AND the truck ping always
+// travel together and neither save clobbers the other's field.
+function cutoffPayload(){ return JSON.stringify({list:CUTOFFS, excludes:CUTOFF_EXCLUDES, truck:TRUCK_TS}); }
 function saveCutoffs(){
   saveLocalCutoffs();   // always keep a device copy so it survives refresh/reload
   render();             // reflect locally at once
-  const payload=JSON.stringify({list:CUTOFFS, excludes:CUTOFF_EXCLUDES});
   if(!CUTOFF_URL || CUTOFF_URL.startsWith("PASTE_")){ toast("Cutoff set (this device — not shared yet)"); return; }
-  postAction(CUTOFF_URL, {action:"savecutoffs", text:payload}).then(r=>{
+  postAction(CUTOFF_URL, {action:"savecutoffs", text:cutoffPayload()}).then(r=>{
     if(r&&r.ok&&r.cutoffs!==undefined){ toast("Cutoffs updated for everyone"); }
     else{ toast("Cutoff set here — add the Code.gs on the Other sheet to share it", true); }
   }).catch(()=>toast("Cutoff set here, but didn't sync", true));
+}
+
+/* ========================================================================
+   🚚  Hidden easter egg — honk the truck for everyone.
+   Trigger: tap the version label (bottom-left) 3× quickly. Broadcasts via
+   the same shared cutoffs store (a `truck` timestamp) — no Pickups rows,
+   no new Code.gs. Every open board sees a newer timestamp on its next poll
+   and drives a truck across the screen once.
+   ======================================================================== */
+let TRUCK_TS    = 0;     // latest honk timestamp we know about (shared)
+let TRUCK_SEEN  = 0;     // the last timestamp THIS screen already animated
+let TRUCK_BUSY  = false; // a truck is currently crossing (don't overlap)
+let TRUCK_PRIMED= false; // have we seen the first sync yet?
+let _truckTaps  = [];    // recent tap times on the version label
+
+// called on every cutoffs poll: if the shared timestamp is newer than what
+// this screen last played, drive the truck. The FIRST sync just primes the
+// baseline — we don't want a stale honk from before you opened the board to
+// play the moment it loads.
+function maybeDriveTruck(){
+  if(!TRUCK_PRIMED){ TRUCK_PRIMED=true; TRUCK_SEEN=TRUCK_TS; return; }
+  if(TRUCK_TS && TRUCK_TS>TRUCK_SEEN){
+    TRUCK_SEEN=TRUCK_TS;
+    driveTruck();
+  }
+}
+
+// the person found the button → stamp a new timestamp and broadcast it.
+function honkTruck(){
+  TRUCK_TS=Date.now();
+  TRUCK_SEEN=TRUCK_TS;      // we already know about our own honk
+  driveTruck();            // play immediately on this screen
+  saveLocalCutoffs();
+  // broadcast to everyone via the shared store (best-effort; silent)
+  if(CUTOFF_URL && !CUTOFF_URL.startsWith("PASTE_")){
+    postAction(CUTOFF_URL, {action:"savecutoffs", text:cutoffPayload()}).catch(()=>{});
+  }
+}
+
+// the animation itself — a truck emoji drives left→right once.
+function driveTruck(){
+  if(TRUCK_BUSY) return; TRUCK_BUSY=true;
+  const el=document.createElement("div");
+  el.className="truck-drive";
+  el.textContent="🚚";
+  el.setAttribute("aria-hidden","true");
+  document.body.appendChild(el);
+  // a little dust puff that trails behind
+  const dust=document.createElement("div");
+  dust.className="truck-dust"; dust.textContent="💨";
+  document.body.appendChild(dust);
+  const done=()=>{ el.remove(); dust.remove(); TRUCK_BUSY=false; };
+  el.addEventListener("animationend", done, {once:true});
+  // safety: clean up even if animationend doesn't fire
+  setTimeout(done, 5200);
+}
+
+// wire the hidden trigger: 3 quick taps on the version label.
+function armTruckTrigger(){
+  const v=document.getElementById("verLabel");
+  if(!v) return;
+  v.style.cursor="default";              // don't hint that it's clickable
+  v.addEventListener("click", ()=>{
+    const now=Date.now();
+    _truckTaps=_truckTaps.filter(t=>now-t<1200);   // taps within 1.2s of each other
+    _truckTaps.push(now);
+    if(_truckTaps.length>=3){ _truckTaps=[]; honkTruck(); }
+  });
 }
 // how much of a commodity is booked in the window FROM TODAY to the cutoff date
 // (counts real, non-cancelled, non-opted-out loads of that commodity across ALL
@@ -1762,6 +1863,7 @@ async function loadAll(){
   loadAnnounce();   // pull the shared scrolling announcement
   loadLocalCutoffs(); // show this device's cutoffs instantly…
   loadCutoffs();    // …then reconcile with the shared (Other sheet) copy
+  armTruckTrigger(); // 🚚 hidden easter egg: 3 quick taps on the version label
   const all=[];
   let anyFail=false, lastErr="";
   // fetch each UNIQUE sheet url once (several booking types can share one sheet)
