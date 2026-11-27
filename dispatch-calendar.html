@@ -75,6 +75,36 @@
   .tonstrip .ton-item b{font-weight:800;color:var(--ink)}
   .tonstrip .ton-total{margin-left:auto;font-weight:800;color:var(--ink)}
   .tonstrip .ton-lead{font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.03em;font-size:10.5px}
+  /* ---- shipment cutoff strip ---- */
+  .cutstrip{flex-shrink:0;display:none;align-items:center;gap:6px 8px;flex-wrap:wrap;
+    padding:6px 16px;background:var(--header-bg);border-bottom:1px solid var(--grid-line)}
+  .cutstrip.show{display:flex}
+  .cutstrip .cut-lead{font-weight:700;color:var(--ink-dim);text-transform:uppercase;
+    letter-spacing:.04em;font-size:10px;margin-right:2px}
+  .cutchip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;
+    background:#fff;border:1.5px solid var(--cc,#999);font-size:11.5px;font-weight:600;color:var(--ink);
+    cursor:pointer;white-space:nowrap}
+  .cutchip .cc-dot{width:8px;height:8px;border-radius:50%;background:var(--cc,#999);flex:0 0 auto}
+  .cutchip .cc-cm{font-weight:800}
+  .cutchip .cc-dt{color:var(--ink-dim)}
+  .cutchip .cc-rem{font-weight:800;color:var(--cc,#555)}
+  .cutchip .cc-bar{width:42px;height:6px;border-radius:3px;background:rgba(0,0,0,.1);overflow:hidden}
+  .cutchip .cc-bar i{display:block;height:100%;background:var(--cc,#999)}
+  .cutchip.cut-met{background:#eafaf0;border-color:#1aa84a}
+  .cutchip.cut-met .cc-rem{color:#1aa84a}
+  .cutchip.cut-over{background:#fdecec;border-color:#d94b4b}
+  .cutchip.cut-over .cc-rem{color:#c62828}
+  .cutchip .cc-add{color:var(--accent);font-weight:800}
+  .cutchip.cut-addbtn{border-style:dashed;border-color:#bbb;color:var(--ink-dim);font-weight:700}
+  /* ---- cutoff marker under a day header ---- */
+  .daycut{margin-top:4px;display:inline-flex;align-items:center;gap:4px;padding:1px 6px;border-radius:6px;
+    border:1px solid var(--cc,#999);font-size:9.5px;font-weight:700;line-height:1.3;max-width:96%;
+    overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+    background:color-mix(in srgb, var(--cc,#999) 15%, #fff)}
+  .daycut .dc-dot{width:6px;height:6px;border-radius:50%;background:var(--cc,#999);flex:0 0 auto}
+  .daycut .dc-rem{font-weight:800}
+  .daycut.cut-met{background:#eafaf0;border-color:#1aa84a;color:#1aa84a}
+  .daycut.cut-over{background:#fdecec;border-color:#d94b4b;color:#c62828}
   /* left zone: brand + grid buttons */
   .left-zone{display:flex;align-items:center;gap:12px}
   /* announcement button */
@@ -578,6 +608,9 @@
     padding:8px 12px;font-size:13px;font-weight:700;color:var(--ink-dim);cursor:pointer;width:100%;margin-bottom:6px}
   .add-service:hover{background:#f0f0f3}
   .status-row{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .cut-optout{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12px;
+    color:var(--ink-dim);cursor:pointer}
+  .cut-optout input{width:15px;height:15px;cursor:pointer}
   /* "apply to all bookings for this grower" — off by default, rarely used */
   .apply-all{display:flex;align-items:flex-start;gap:8px;margin:2px 0 14px;padding:8px 10px;
     background:#fff7ed;border:1px solid #fed7aa;border-radius:9px;cursor:pointer;
@@ -642,7 +675,7 @@
   <div class="topbar">
     <!-- LEFT: brand + commodity filter + transporter filter -->
     <div class="left-zone">
-      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.3</span></div>
+      <div class="brand">Demeter Grainboard<span class="sub">Tipping</span><span class="ver" id="verLabel">v8.4</span></div>
       <select class="filter-sel" id="commodityFilter">
         <option value="__ALL__">All commodities</option>
       </select>
@@ -691,6 +724,9 @@
     <span class="ticker-tag">📢</span>
     <div class="ticker-view"><div class="ticker-track" id="tickerTrack"></div></div>
   </div>
+
+  <!-- shipment cutoff strip: colour-coded targets with "X to go" -->
+  <div class="cutstrip" id="cutstrip"></div>
 
   <!-- subtle tonnage summary strip (estimated from loads × per-commodity tonnage) -->
   <div class="tonstrip" id="tonstrip"></div>
@@ -851,6 +887,52 @@ function renderTonstrip(filtered, days){
       `<span class="ton-total">Total ${fmtT(total)}</span>`;
   }
   strip.className="tonstrip show";
+}
+
+/* render the shipment-cutoff strip along the top. Always shows the "+ Cutoff"
+   button so you can add one even when none exist yet. */
+function fmtCutDate(key){
+  const d=dateFromKey(key); if(!d) return key;
+  const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const MO=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return `${WD[d.getDay()]} ${d.getDate()} ${MO[d.getMonth()]}`;
+}
+function renderCutstrip(){
+  const strip=document.getElementById("cutstrip");
+  if(!strip) return;
+  // sort by date ascending; expired-met ones drop off after their date passes
+  const list=[...CUTOFFS].sort((a,b)=>(+a.date||0)-(+b.date||0));
+  let html=`<span class="cut-lead">Cutoffs</span>`;
+  list.forEach(co=>{
+    const st=cutoffStatus(co);
+    const col=commodityVar(co.commodity,"");
+    const cls = st.met ? "cut-met" : (st.past ? "cut-over" : "");
+    const remTxt = st.met ? "✓ Met"
+      : (st.past ? `${fmtT(st.remaining)} short` : `${fmtT(st.remaining)} to go`);
+    html+=`<span class="cutchip ${cls}" style="--cc:${col}" onclick="editCutoff('${co.id}')" title="${esc(co.commodity)} cutoff ${esc(fmtCutDate(co.date))} — ${fmtT(st.booked)} of ${fmtT(co.target)}">`
+      +`<span class="cc-dot"></span><span class="cc-cm">${esc(co.commodity)}</span>`
+      +`<span class="cc-dt">· ${esc(fmtCutDate(co.date))}</span>`
+      +`<span class="cc-rem">${remTxt}</span>`
+      +(st.met?``:`<span class="cc-bar"><i style="width:${st.pct}%"></i></span>`)
+      +`</span>`;
+  });
+  html+=`<span class="cutchip cut-addbtn" onclick="addCutoff()" title="Add a shipment cutoff"><span class="cc-add">+</span> Cutoff</span>`;
+  strip.innerHTML=html;
+  strip.className="cutstrip show";   // always show (so the + button is reachable)
+}
+// marker HTML for a given day (used in the day header). Returns "" if none.
+function dayCutoffHTML(d){
+  const key=dayKey(d);
+  const hits=CUTOFFS.filter(co=>co.date===key);
+  if(!hits.length) return "";
+  return hits.map(co=>{
+    const st=cutoffStatus(co);
+    const col=commodityVar(co.commodity,"");
+    const cls = st.met ? "cut-met" : (st.past ? "cut-over" : "");
+    const rem = st.met ? "✓" : (st.past ? `${fmtT(st.remaining)} short` : `${fmtT(st.remaining)} to go`);
+    return `<div class="daycut ${cls}" style="--cc:${col}" title="${esc(co.commodity)} cutoff">`
+      +`<span class="dc-dot"></span>${esc(co.commodity)} <span class="dc-rem">${rem}</span></div>`;
+  }).join("");
 }
 
 function colorKey(commodity, grade){
@@ -1273,6 +1355,163 @@ function editAnnounce(){
   }).catch(()=>toast("Set here, but didn't sync", true));
 }
 
+/* ======================= SHIPMENT CUTOFFS ===================================
+   Shared targets like "Barley · 3 Dec · 381t". Every load of that commodity
+   tipping ON OR BEFORE the date counts toward it (unless the load is opted out),
+   so the board shows "X to go". Stored shared via PropertiesService (same as the
+   announcement) — NEVER touches the Pickups rows. Each cutoff:
+     { id, commodity, date:"YYYY-MM-DD", target:Number }
+   Per-load opt-out is j.noCutoff (an editor toggle). */
+const CUTOFF_URL = OTHER_URL;
+let CUTOFFS = [];            // array of cutoff objects
+let CUTOFF_EXCLUDES = [];    // job ids opted OUT of cutoff counting (shared with cutoffs)
+async function loadCutoffs(){
+  if(!CUTOFF_URL || CUTOFF_URL.startsWith("PASTE_")) return;
+  try{
+    const res=await fetch(CUTOFF_URL+"?cutoffs=1&_cb="+Date.now(), {redirect:"follow"});
+    const data=await res.json();
+    if(data.ok){
+      let obj={};
+      try{ obj=JSON.parse(data.cutoffs||"{}")||{}; }catch(e){ obj={}; }
+      // tolerate the old plain-array format, else {list, excludes}
+      if(Array.isArray(obj)){ CUTOFFS=obj; CUTOFF_EXCLUDES=[]; }
+      else { CUTOFFS=Array.isArray(obj.list)?obj.list:[]; CUTOFF_EXCLUDES=Array.isArray(obj.excludes)?obj.excludes:[]; }
+      render();
+    }
+  }catch(e){ console.warn("[dispatch] cutoffs load fail:", e); }
+}
+function saveCutoffs(){
+  render();   // reflect locally at once
+  const payload=JSON.stringify({list:CUTOFFS, excludes:CUTOFF_EXCLUDES});
+  if(!CUTOFF_URL || CUTOFF_URL.startsWith("PASTE_")){ toast("Cutoffs set (this device — not synced)"); return; }
+  postAction(CUTOFF_URL, {action:"savecutoffs", text:payload}).then(r=>{
+    if(r&&r.ok){ toast("Cutoffs updated for everyone"); }
+    else{ toast("Set here, but didn't sync", true); }
+  }).catch(()=>toast("Set here, but didn't sync", true));
+}
+// how much of a commodity has been booked on/before a cutoff date (counts real,
+// non-cancelled, non-opted-out loads of that commodity across ALL transporters)
+function cutoffBooked(co){
+  const end=dateFromKey(co.date); if(!end) return 0;
+  end.setHours(23,59,59,999);
+  const cname=(co.commodity||"").toLowerCase().trim();
+  let t=0;
+  (STATE.jobs||[]).forEach(j=>{
+    if(j.isBusy) return;
+    if(j.noCutoff || CUTOFF_EXCLUDES.indexOf(j.id)>=0) return;   // opted out (this load)
+    if(/^cancel/i.test(j.apptStatus||"")) return;
+    if(!j.tipDate || j.tipDate>end) return;                 // only on/before the cutoff
+    const jc=(j.commodity||"").toLowerCase().trim();
+    // match the base commodity (so "Barley" matches "Barley", and a graded
+    // "Lentils — Nipper" still matches a "Lentils" cutoff)
+    if(jc===cname || jc.split(/\s*[—–-]\s*/)[0].trim()===cname) t+=loadTons(j);
+  });
+  return t;
+}
+function cutoffStatus(co){
+  const booked=cutoffBooked(co);
+  const remaining=Math.max(0, (+co.target||0)-booked);
+  const pct=co.target>0 ? Math.min(100, Math.round(booked/co.target*100)) : 0;
+  const end=dateFromKey(co.date);
+  const today=new Date(); today.setHours(0,0,0,0);
+  const past = end ? (end<today) : false;
+  const met = booked>=(+co.target||0);
+  return { booked, remaining, pct, met, past };
+}
+// parse a user-typed date like "3 Dec", "3/12", "2026-12-03", "Dec 3"
+// → the numeric YYYYMMDD day-key the rest of the board uses (0 if unreadable).
+// If the month/day has already passed this year, roll to next year so a
+// "3 Dec" typed in late December still means the upcoming one.
+function mkCutKey(y,mo,da){ return y*10000+(mo-1)*100+da; }   // matches dayKey()
+function rollYear(mo,da){
+  const now=new Date(); now.setHours(0,0,0,0);
+  let y=now.getFullYear();
+  if(mkCutKey(y,mo,da) < dayKey(now)) y++;
+  return y;
+}
+function parseCutoffDate(s){
+  s=(s||"").trim(); if(!s) return 0;
+  const MO={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  // ISO "2026-12-03"
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m) return mkCutKey(+m[1], +m[2], +m[3]);
+  // "3 Dec" / "3 December"
+  m=s.match(/^(\d{1,2})\s+([A-Za-z]{3,})$/);
+  if(m){ const mo=MO[m[2].slice(0,3).toLowerCase()]; if(mo) return mkCutKey(rollYear(mo,+m[1]), mo, +m[1]); }
+  // "Dec 3" / "December 3"
+  m=s.match(/^([A-Za-z]{3,})\s+(\d{1,2})$/);
+  if(m){ const mo=MO[m[1].slice(0,3).toLowerCase()]; if(mo) return mkCutKey(rollYear(mo,+m[2]), mo, +m[2]); }
+  // "3/12" or "3/12/2026"  (day/month, AU order)
+  m=s.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if(m){ const da=+m[1], mo=+m[2]; let y=m[3]?(+m[3]<100?2000+ +m[3]:+m[3]):rollYear(mo,da); return mkCutKey(y,mo,da); }
+  return 0;
+}
+// the base commodity of the booking currently being edited (first service)
+function editCommodityName(){
+  const sv=(EDIT && EDIT.services && EDIT.services[0]) || {};
+  const c=(sv.commodity||"").trim();
+  return c.split(/\s*[—–-]\s*/)[0].trim() || c;
+}
+// is there an active cutoff matching this booking's commodity? (so we only show
+// the opt-out checkbox when it actually means something)
+function cutoffAppliesToEdit(){
+  const cn=editCommodityName().toLowerCase();
+  if(!cn) return false;
+  return CUTOFFS.some(co=>(co.commodity||"").toLowerCase().trim()===cn);
+}
+function addCutoff(){
+  const commodity=prompt("Cutoff — which commodity?\n(e.g. Barley, Canola, Oats)","");
+  if(commodity===null) return;
+  if(!commodity.trim()){ toast("No commodity entered"); return; }
+  const dRaw=prompt(`Cutoff date for ${commodity.trim()}?\n(e.g. 3 Dec, 3/12, or 2026-12-03)`,"");
+  if(dRaw===null) return;
+  const date=parseCutoffDate(dRaw);
+  if(!date){ toast("Couldn't read that date — try '3 Dec'", true); return; }
+  const tRaw=prompt(`Tonnage needed for ${commodity.trim()} by ${fmtCutDate(date)}?\n(e.g. 381)`,"");
+  if(tRaw===null) return;
+  const target=parseFloat(String(tRaw).replace(/[^0-9.]/g,""));
+  if(!(target>0)){ toast("Enter a tonnage number", true); return; }
+  CUTOFFS.push({ id:"c"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
+    commodity:commodity.trim(), date, target });
+  saveCutoffs();
+  toast(`Cutoff added: ${commodity.trim()} ${fmtT(target)} by ${fmtCutDate(date)}`);
+}
+function editCutoff(id){
+  const co=CUTOFFS.find(c=>c.id===id); if(!co) return;
+  const st=cutoffStatus(co);
+  const choice=prompt(
+    `${co.commodity} cutoff — ${fmtCutDate(co.date)}\n`+
+    `Target ${fmtT(co.target)} · booked ${fmtT(st.booked)} · ${st.met?"met ✓":fmtT(st.remaining)+" to go"}\n\n`+
+    `Type a NEW tonnage to change the target,\n`+
+    `type DATE to change the date,\n`+
+    `type DELETE to remove this cutoff,\n`+
+    `or Cancel to close.`, String(co.target));
+  if(choice===null) return;
+  const v=choice.trim();
+  if(/^delete$/i.test(v)){
+    CUTOFFS=CUTOFFS.filter(c=>c.id!==id); saveCutoffs(); toast("Cutoff removed"); return;
+  }
+  if(/^date$/i.test(v)){
+    const dRaw=prompt("New cutoff date?\n(e.g. 3 Dec, 3/12, 2026-12-03)", co.date);
+    if(dRaw===null) return;
+    const nd=parseCutoffDate(dRaw);
+    if(!nd){ toast("Couldn't read that date", true); return; }
+    co.date=nd; saveCutoffs(); toast("Cutoff date updated"); return;
+  }
+  const nt=parseFloat(v.replace(/[^0-9.]/g,""));
+  if(nt>0){ co.target=nt; saveCutoffs(); toast("Cutoff target updated"); }
+  else toast("No change", true);
+}
+// per-load opt-out: add/remove this booking's id from the shared exclude list
+function toggleCutoffExclude(off){
+  if(!EDIT || !EDIT.id) return;
+  const id=EDIT.id, i=CUTOFF_EXCLUDES.indexOf(id);
+  if(off && i<0) CUTOFF_EXCLUDES.push(id);
+  else if(!off && i>=0) CUTOFF_EXCLUDES.splice(i,1);
+  EDIT.noCutoff=off;                 // keep the in-memory job in step for instant recount
+  saveCutoffs();                     // persists {list, excludes} and re-renders chips
+}
+
 // change a commodity/grade colour for EVERYONE (writes to the shared sheet)
 function saveSharedColor(key, hex){
   key=(key||"").trim().toLowerCase(); if(!key) return;
@@ -1452,6 +1691,7 @@ async function loadAll(){
   loadDrivers();   // refresh per-transporter driver lists in the background
   loadSharedColors().then(()=>render());   // pull shared colours, then repaint
   loadAnnounce();   // pull the shared scrolling announcement
+  loadCutoffs();    // pull the shared shipment cutoffs
   const all=[];
   let anyFail=false, lastErr="";
   // fetch each UNIQUE sheet url once (several booking types can share one sheet)
@@ -1624,6 +1864,7 @@ function render(){
     html+=`<div class="dayhead${today?" today":""}${alt}">
       <span class="dow">${WD[d.getDay()]}</span>
       <span class="dnum">${d.getDate()}</span>
+      ${dayCutoffHTML(d)}
       ${STATE.gridFilter===0
         ? `<div class="lanes-mini"><span class="lane-cap">Grid 1</span><span class="lane-cap">Grid 2</span></div>`
         : `<div class="lanes-mini"><span class="lane-cap" style="flex:1">Grid ${STATE.gridFilter}</span></div>`}
@@ -1649,6 +1890,7 @@ function render(){
     (!STATE.hideCancelled || !/^cancel/i.test(j.apptStatus||""))
   );
   renderTonstrip(filtered, days);
+  renderCutstrip();
 
   days.forEach((d,di)=>{
     const today=sameDay(d,new Date());
@@ -2792,6 +3034,11 @@ function renderEditor(){
           ${ngrControlHTML(EDIT)}
         </div>
       </div>
+      ${cutoffAppliesToEdit() ? `
+      <label class="cut-optout">
+        <input type="checkbox" ${CUTOFF_EXCLUDES.indexOf(EDIT.id)>=0?'checked':''} onchange="toggleCutoffExclude(this.checked)">
+        Don't count this load toward the ${esc(editCommodityName())} cutoff
+      </label>` : ``}
       <div class="note-field">
         <label for="editNote">📝 Team note ${EDIT.notes?'<span class="note-has">• 📩 shown</span>':''}</label>
         <textarea id="editNote" rows="2" placeholder="Note for our team (shows a 📩 icon on the booking)" oninput="EDIT.notes=this.value">${esc(EDIT.notes||'')}</textarea>
